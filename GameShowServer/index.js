@@ -14,22 +14,49 @@ const url = "mongodb://localhost:27017/";
 var tokenMap = {};
 
 io.on('connection', client => {
-  client.on('event', data => { /* … */ });
-  client.on('disconnect', () => { /* … */ });
-  client.on('uploadVideo', (id, data) => {handleVideoUpload(id, data)});
+    client.on('event', data => { /* … */
+    });
+    client.on('disconnect', () => { /* … */
+    });
+    client.on('uploadFile', (id, data) => {
+        console.log(id);
+        handleVideoUpload(id, data)
+    });
+    client.on("downloadFile", (id) => {
+        console.log(id);
+        getVideo("notImplemented", id, client);
+    });
+
+    client.on('login', (username, password) => {
+        console.log(username);
+        client.emit("login", "{'response':'success'}") //TODO skal nok gøre noget
+    })
+
+
 });
 server.listen(port);
 
 mongoClient.connect(url, (err, db) => {
-  if (err) throw err;
-  var dbo = db.db(dbName);
-  dbo.createCollection("videos", function(err, res) {
     if (err) throw err;
-});
+    var dbo = db.db(dbName);
+    dbo.createCollection("videos", function (err, res) {
+        if (err) throw err;
+    });
 });
 
 
-function getVideo(token, userId, roundNumber) {
+function getVideo(token, id /*userId, roundNumber*/, client) {//TODO jeg ved ikke om det ikke er nemmere, at klienten har videonavn, i forhold til userid og roundnumber
+    mongoClient.connect(url, (err, db) => {
+        if (err) throw err;
+        const dbo = db.db(dbName);
+        dbo.collection("videos").findOne({_id: id}, (err, result) => {
+            if (err) throw err;
+            console.log("found");
+            db.close();
+            console.log(result.binary.buffer);
+            client.emit("download", result.binary.buffer);
+        });
+    });
 }
 
 function match(token) {
@@ -50,21 +77,22 @@ function login(username, password) {
 }
 
 function checkToken(token) {
-  //check if token is still active
+    //check if token is still active
 }
 
+
 function handleVideoUpload(id, data) {
-  mongoClient.connect(url, (err, db) => {
-    if (err) throw err;
-    var dbo = db.db(dbName);
-    dbo.collection("videos").findOne({_id:id}, (err, result) => {
-      if(err) throw err;
-      if(result) {
-        dbo.collection("videos").update({_id:id}, {binary:data});
-      } else {
-        dbo.collection("videos").insertOne({_id:id, binary:data});
-      }
-      db.close();
+    mongoClient.connect(url, (err, db) => {
+        if (err) throw err;
+        const dbo = db.db(dbName);
+        dbo.collection("videos").findOne({_id: id}, (err, result) => {
+            if (err) throw err;
+            if (result) {
+                dbo.collection("videos").update({_id: id}, {binary: data});
+            } else {
+                dbo.collection("videos").insertOne({_id: id, binary: data});
+            }
+            db.close();
+        });
     });
-  });
 }
