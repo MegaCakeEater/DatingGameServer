@@ -11,88 +11,124 @@ const port = 3000;
 const dbName = "GameShowDatingAppDB";
 const mongoClient = require('mongodb').MongoClient;
 const url = "mongodb://localhost:27017/";
-var tokenMap = {};
+let tokenMap = new Map();
 
 io.on('connection', client => {
-    client.on('event', data => { /* … */
+  client.on('event', data => { /* … */
+  });
+  client.on('disconnect', () => { /* … */
+  });
+  client.on('uploadFile', (id, data) => {
+    console.log(id);
+    handleVideoUpload(id, data)
+  });
+  client.on("downloadFile", (id) => {
+    console.log(id);
+    getVideo("notImplemented", id, client);
+  });
+  client.on("createUser", (username, password, sex, age) => {
+    console.log("createUser " + username + " " + password + " " + sex + " " + age);
+    createUser(username, password, sex, age, (success) => {
+      client.emit('response', success);
     });
-    client.on('disconnect', () => { /* … */
-    });
-    client.on('uploadFile', (id, data) => {
-        console.log(id);
-        handleVideoUpload(id, data)
-    });
-    client.on("downloadFile", (id) => {
-        console.log(id);
-        getVideo("notImplemented", id, client);
-    });
+  });
+  client.on("getUser", (token, username) => {
+    console.log("getUser " + token + " " + user);
+    getUser(token, username);
+  });
 
-    client.on('login', (username, password) => {
-        console.log(username);
-        client.emit("login", "{'response':'success'}") //TODO skal nok gøre noget
-    })
+  client.on('login', (username, password) => {
+    console.log(username);
+    login(username, password);
+    client.emit("login", "{'response':'success'}"); //TODO skal nok gøre noget
+  })
 
 
 });
 server.listen(port);
 
 mongoClient.connect(url, (err, db) => {
+  if (err) throw err;
+  var dbo = db.db(dbName);
+  dbo.createCollection("videos", function (err, res) {
     if (err) throw err;
-    var dbo = db.db(dbName);
-    dbo.createCollection("videos", function (err, res) {
-        if (err) throw err;
-    });
+  });
 });
 
 
 function getVideo(token, id /*userId, roundNumber*/, client) {//TODO jeg ved ikke om det ikke er nemmere, at klienten har videonavn, i forhold til userid og roundnumber
-    mongoClient.connect(url, (err, db) => {
-        if (err) throw err;
-        const dbo = db.db(dbName);
-        dbo.collection("videos").findOne({_id: id}, (err, result) => {
-            if (err) throw err;
-            console.log("found");
-            db.close();
-            console.log(result.binary.buffer);
-            client.emit("download", result.binary.buffer);
-        });
+  mongoClient.connect(url, (err, db) => {
+    if (err) throw err;
+    const dbo = db.db(dbName);
+    dbo.collection("videos").findOne({ _id: id }, (err, result) => {
+      if (err) throw err;
+      console.log("found");
+      db.close();
+      console.log(result.binary.buffer);
+      client.emit("download", result.binary.buffer);
     });
+  });
 }
 
 function match(token) {
 
 }
 
-function login(username, password) {
-//check credentials
+function generateUUID() {
+  return '_' + Math.random().toString(36).substr(2, 9);
+}
 
-//eliminate existing tokens if any
-
-//generate token
-
-//associate token with username and createtime
-
-//return token
-
+function login(username, password, successCallback) {
+  //check credentials
+  mongoClient.connect(url, (err, db) => {
+    if (err) throw err;
+    const dbo = db.db(dbName);
+    dbo.collection("users").findOne({ _username: username, _password: password }, (err, result) => {
+      if (err) return "Login Unsucessful";
+      db.close();
+      let token = generateUUID();
+      tokenMap.set(token, username);
+      successCallback(true);
+    });
+  });
 }
 
 function checkToken(token) {
-    //check if token is still active
+  //if not good throw err else do nothing, maybe maintain tokens
 }
 
 
 function handleVideoUpload(id, data) {
-    mongoClient.connect(url, (err, db) => {
-        if (err) throw err;
-        const dbo = db.db(dbName);
-        dbo.collection("videos").findOne({_id: id}, (err, result) => {
-            if (err) throw err;
-            if (result) {
-                dbo.collection("videos").update({_id: id}, {binary: data});
-            } else {
-                dbo.collection("videos").insertOne({_id: id, binary: data});
-            }
-            db.close();
-        });
+  mongoClient.connect(url, (err, db) => {
+    if (err) throw err;
+    const dbo = db.db(dbName);
+    dbo.collection("videos").update({ _id: id }, { binary: data }, { upsert: true });
+    db.close();
+  });
+}
+
+function createUser(username, password, sex, age, callback) {
+  mongoClient.connect(url, (err, db) => {
+    if (err) throw err;
+    const dbo = db.db(dbName);
+    dbo.collection("users").insertOne({ username: username, password: password, sex: sex, age: age },
+      (err, result) => {
+        if (err) callback(false);
+        callback(true);
+      });
+    db.close();
+  });
+}
+
+function getUser(token, user) {
+  checkToken(token);
+  mongoClient.connect(url, (err, db) => {
+    if (err) throw err;
+    const dbo = db.db(dbName);
+    dbo.collection("users").findOne({ _username: user }, (err, result) => {
+      if (err) return {};
+      db.close();
+      return result;
     });
+  });
 }
