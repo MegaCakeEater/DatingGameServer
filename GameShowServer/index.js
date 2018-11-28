@@ -18,13 +18,12 @@ io.on('connection', client => {
   });
   client.on('disconnect', () => { //do nothing
   });
-  client.on("uploadFile", (id, data) => {
-    console.log(id);
-    handleVideoUpload(id, data, client)
+  client.on("uploadFile", (token, roundnumber, data) => {
+    console.log("asd");
+    handleVideoUpload(token, roundnumber, data, client)
   });
-  client.on("downloadFile", (id, token) => {
-    console.log(id);
-    getVideo(token, id, client);
+  client.on("downloadFile", (token, username, roundNumber) => {
+    getVideo(token, username, roundNumber, client);
   });
   client.on("createUser", (username, password, sex, age) => {
     console.log("createUser " + username + " " + password + " " + sex + " " + age);
@@ -41,10 +40,10 @@ io.on('connection', client => {
     match(token, client);
   });
   client.on("updateBiography", (token, bio) => { //todo
-    updateBiography(token, bio);
+    updateBiography(token, bio, client);
   });
   client.on("updateProfilePicture", (token, pic) => { //todo
-    updateProfilePicture(token, pic);
+    updateProfilePicture(token, pic, client);
   });
 });
 server.listen(port);
@@ -58,7 +57,7 @@ mongoClient.connect(url, (err, db) => {
 });
 
 
-function getVideo(token, username, roundnumber , client) {
+function getVideo(token, username, roundNumber, client) {
   if(!checkToken(token, client)) return;
   mongoClient.connect(url, (err, db) => {
     if (err) {
@@ -67,7 +66,7 @@ function getVideo(token, username, roundnumber , client) {
       return;
     }
     const dbo = db.db(dbName);
-    let round = "round"+roundnumber;
+    let round = "round"+roundNumber;
     dbo.collection("videos").findOne({ _id: username}, (err, result) => {
       if (err) {
         db.close();
@@ -103,8 +102,7 @@ function login(username, password, client) {
         db.close();
         return;
       }
-      db.close();
-      if(result) {
+      else if(result != null) {
         let token = generateUUID();
         tokenMap.set(token, username);
         client.emit("login", token);
@@ -116,7 +114,7 @@ function login(username, password, client) {
   });
 }
 
-function checkToken(token, client, callback) {
+function checkToken(token, client) {
   if (!tokenMap.has(token)) {
     client.emit("invalid token");
     return false;
@@ -130,8 +128,8 @@ function handleVideoUpload(token, roundNumber, data, client) {
   mongoClient.connect(url, (err, db) => {
     let username = tokenMap.get(token);
     if (err) {
-      client.emit("uploadFile","failure");
       db.close();
+      client.emit("uploadFile","failure");
       return;
     }
     const dbo = db.db(dbName);
@@ -163,7 +161,7 @@ function createUser(username, password, sex, age, client) {
   });
 }
 
-function updateBiography(token, bio) {
+function updateBiography(token, bio, client) {
   if(!checkToken(token, client)) return;
   let username = tokenMap.get(token);
   mongoClient.connect(url, (err, db) => {
@@ -186,7 +184,7 @@ function updateBiography(token, bio) {
   });
 }
 
-function updateProfilePicture(token, pic) {
+function updateProfilePicture(token, pic, client) {
   if(!checkToken(token, client)) return;
   let username = tokenMap.get(token);
   mongoClient.connect(url, (err, db) => {

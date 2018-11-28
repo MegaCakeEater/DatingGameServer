@@ -16,33 +16,29 @@ const socket = io('http://localhost:3000');
 //   });
 // });
 
-socket.on("createUserSuccess", () => {
-  console.log("succ");
+socket.on("createUser", (response) => {
+  console.log("createUser " + response);
 });
-socket.on("createUserFailed", () => {
-  console.log("fail");
-});
-socket.on("loginSuccess", (token) => {
-  console.log(token);
+socket.on("login", (token) => {
+  console.log("login " + token);
   myToken = token;
   socket.emit("match", myToken);
+  socket.emit("uploadFile", myToken, 1, "aaa");
 });
-socket.on("loginFailed",() => {
-  console.log("login failed");
-});
-socket.on("matchSuccess",(response)=> {
-  console.log(response);
+socket.on("match",(response)=> {
+  console.log("match " + response);
 });
 socket.on("getUser", (response)=> {
-console.log(response);
+console.log("getUser " + response);
 });
 socket.on("invalid token",() =>{
 console.log("invalid token");
+});
+socket.on("uploadFile", (response) => {
+console.log("uploadFIle " + response);
 });
 
 socket.emit("createUser","hest","1234","yes",18);
 socket.emit("createUser","hest2","1234","yes",19);
 socket.emit("createUser","hest3","1234","yes",20);
-socket.emit("login","hest","123aaa");
 socket.emit("login","hest","1234");
-socket.emit("getUser","123", "hest");
