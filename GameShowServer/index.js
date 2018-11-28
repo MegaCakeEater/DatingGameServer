@@ -111,9 +111,9 @@ function handleVideoUpload(token, roundNumber, data, client) {
     if (err) {
       client.emit("uploadFailure");
       throw err;
-    } 
+    }
     const dbo = db.db(dbName);
-    dbo.collection("videos").update({ username: username, roundNumber: roundNumber }, {video: data }, { upsert: true });
+    dbo.collection("videos").update({ username: username, roundNumber: roundNumber }, { video: data }, { upsert: true });
     db.close();
     client.emit("uploadSuccess");
   });
@@ -123,10 +123,43 @@ function createUser(username, password, sex, age, client) {
   mongoClient.connect(url, (err, db) => {
     if (err) throw err;
     const dbo = db.db(dbName);
-    dbo.collection("users").insertOne({ username: username, password: password, sex: sex, age: age },
+    dbo.collection("users").insertOne({ username: username, password: password, sex: sex, age: age, biography: "", profilePicture: null },
       (err, result) => {
         if (err) client.emit("createUserFailed");
         client.emit("createUserSuccess");
+      });
+    db.close();
+  });
+}
+
+function updateBiography(token, bio) {
+  checkToken(token);
+  let username = tokenMap.get(token);
+  mongoClient.connect(url, (err, db) => {
+    if (err) throw err;
+    const dbo = db.db(dbName);
+    dbo.collection("users").updateOne({ username: username }, { biography: bio },
+      (err, result) => {
+        if (err) client.emit("updateBiographyFailed");
+        client.emit("updateBiographySuccess");
+      });
+    db.close();
+  });
+}
+
+function updateProfilePicture(token, pic) {
+  checkToken(token);
+  let username = tokenMap.get(token);
+  mongoClient.connect(url, (err, db) => {
+    if (err) throw err;
+    const dbo = db.db(dbName);
+    dbo.collection("users").updateOne({ username: username }, { profilePicture: pic },
+      (err, result) => {
+        if (err) {
+          client.emit("updateProfilePictureFailed");
+          throw err;
+        }
+        client.emit("updateProfilePictureSuccess");
       });
     db.close();
   });
