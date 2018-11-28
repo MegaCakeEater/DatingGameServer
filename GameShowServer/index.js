@@ -60,15 +60,21 @@ mongoClient.connect(url, (err, db) => {
 });
 
 
-function getVideo(token, id /*userId, roundNumber*/, client) {//TODO jeg ved ikke om det ikke er nemmere, at klienten har videonavn, i forhold til userid og roundnumber
+function getVideo(token, username, roundnumber , client) {
   checkToken(token, client)
   mongoClient.connect(url, (err, db) => {
-    if (err) throw err;
+    if (err) {
+      client.emit("getVideoFailed");
+      throw err;
+    }
     const dbo = db.db(dbName);
-    dbo.collection("videos").findOne({ _id: id }, (err, result) => {
-      if (err) throw err;
+    dbo.collection("videos").findOne({ username: username, roundNumber:roundnumber }, (err, result) => {
+      if (err) {
+        client.emit("getVideoFailed");
+        throw err;
+      }
       db.close();
-      client.emit("download", result.binary.buffer);
+      client.emit("getVideoSucces", result.binary.buffer);
     });
   });
 }
@@ -87,7 +93,11 @@ function login(username, password, client) {
     if (err) throw err;
     const dbo = db.db(dbName);
     dbo.collection("users").findOne({ _username: username, _password: password }, (err, result) => {
-      if (err) client.emit("loginFailed");
+      if (err) {
+        client.emit("loginFailed");
+        db.close();
+        throw err;
+      } 
       db.close();
       let token = generateUUID();
       tokenMap.set(token, username);
@@ -110,6 +120,7 @@ function handleVideoUpload(token, roundNumber, data, client) {
     let username = tokenMap.get(token);
     if (err) {
       client.emit("uploadFailure");
+      db.close();
       throw err;
     }
     const dbo = db.db(dbName);
@@ -125,8 +136,12 @@ function createUser(username, password, sex, age, client) {
     const dbo = db.db(dbName);
     dbo.collection("users").insertOne({ username: username, password: password, sex: sex, age: age, biography: "", profilePicture: null },
       (err, result) => {
-        if (err) client.emit("register","false");
-        client.emit("register","true");
+        if (err) {
+          client.emit("register",false);
+          db.close();
+          throw err;
+        }
+        client.emit("register",true);
       });
     db.close();
   });
@@ -136,11 +151,19 @@ function updateBiography(token, bio) {
   checkToken(token);
   let username = tokenMap.get(token);
   mongoClient.connect(url, (err, db) => {
-    if (err) throw err;
+    if (err) {
+      client.emit("updateBiographyFailed");
+      db.close();
+      throw err;
+    } 
     const dbo = db.db(dbName);
     dbo.collection("users").updateOne({ username: username }, { biography: bio },
       (err, result) => {
-        if (err) client.emit("updateBiographyFailed");
+        if (err) {
+          client.emit("updateBiographyFailed");
+          db.close();
+          throw err;
+        } 
         client.emit("updateBiographySuccess");
       });
     db.close();
