@@ -50,10 +50,10 @@ io.on('connection', client => {
 server.listen(port);
 
 mongoClient.connect(url, (err, db) => {
-  if (err) throw err;
+  if (err) return;
   var dbo = db.db(dbName);
   dbo.createCollection("videos", function (err, res) {
-    if (err) throw err;
+    if (err) return;
   });
 });
 
@@ -64,17 +64,18 @@ function getVideo(token, username, roundnumber , client) {
     if (err) {
       db.close();
       client.emit("getVideo","failure");
-      throw err;
+      return;
     }
     const dbo = db.db(dbName);
-    dbo.collection("videos").findOne({ username: username, roundNumber:roundnumber }, (err, result) => {
+    let round = "round"+roundnumber;
+    dbo.collection("videos").findOne({ _id: username}, (err, result) => {
       if (err) {
         db.close();
         client.emit("getVideo","failure");
-        throw err;
+        return;
       }
       db.close();
-      client.emit("getVideo", result.binary.buffer);
+      client.emit("getVideo", result.round.binary.buffer);
     });
   });
 }
@@ -93,14 +94,14 @@ function login(username, password, client) {
     if (err) {
       client.emit("login","failure");
       db.close();
-      throw err;
+      return;
     } 
     const dbo = db.db(dbName);
-    dbo.collection("users").findOne({ username: username, password: password }, (err, result) => {
+    dbo.collection("users").findOne({ _id: username, password: password }, (err, result) => {
       if (err) {
         client.emit("login","failure");
         db.close();
-        throw err;
+        return;
       }
       db.close();
       if(result) {
@@ -131,10 +132,11 @@ function handleVideoUpload(token, roundNumber, data, client) {
     if (err) {
       client.emit("uploadFile","failure");
       db.close();
-      throw err;
+      return;
     }
     const dbo = db.db(dbName);
-    dbo.collection("videos").update({ username: username, roundNumber: roundNumber }, { video: data }, { upsert: true });
+    let round ="round"+roundNumber;
+    dbo.collection("videos").update({ _id: username}, { round: data }, { upsert: true });
     db.close();
     client.emit("uploadFile","success");
   });
@@ -145,15 +147,15 @@ function createUser(username, password, sex, age, client) {
     if (err) {
       client.emit("createUser","failure");
       db.close();
-      throw err;
+      return;
     }
     const dbo = db.db(dbName);
-    dbo.collection("users").insertOne({ username: username, password: password, sex: sex, age: age, biography: "", profilePicture: null },
+    dbo.collection("users").insertOne({ _id: username, password: password, sex: sex, age: age, biography: "", profilePicture: null },
       (err, result) => {
         if (err) {
           client.emit("createUser","failure");
           db.close();
-          throw err;
+          return;
         }
         client.emit("createUser","success");
       });
@@ -168,7 +170,7 @@ function updateBiography(token, bio) {
     if (err) {
       client.emit("updateBiography","failure");
       db.close();
-      throw err;
+      return;
     } 
     const dbo = db.db(dbName);
     dbo.collection("users").updateOne({ username: username }, { biography: bio },
@@ -176,7 +178,7 @@ function updateBiography(token, bio) {
         if (err) {
           db.close();
           client.emit("updateBiography","failure");
-          throw err;
+          return;
         } 
       });
     db.close();
@@ -191,7 +193,7 @@ function updateProfilePicture(token, pic) {
     if (err) {
       db.close();
       client.emit("updateProfilePicture", "failure");
-      throw err;
+      return;
     } 
     const dbo = db.db(dbName);
     dbo.collection("users").updateOne({ username: username }, { profilePicture: pic },
@@ -199,7 +201,7 @@ function updateProfilePicture(token, pic) {
         if (err) {
           db.close();
           client.emit("updateProfilePicture", "failure");
-          throw err;
+          return;
         }
       });
     db.close();
@@ -213,14 +215,14 @@ function getUser(token, user, client) {
     if (err) {
       db.close();
       client.emit("getUser", "failure");
-      throw err;
+      return;
     }
     const dbo = db.db(dbName);
-    dbo.collection("users").findOne({ username: user }, (err, result) => {
+    dbo.collection("users").findOne({ _id: user }, (err, result) => {
       if (err) {
         db.close();
         client.emit("getUser", "failure");
-        throw err;
+        return;
       }
       db.close();
       client.emit("getUser", result);
