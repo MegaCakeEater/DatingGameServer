@@ -68,7 +68,7 @@ function getVideo(token, username, roundNumber, client) {
     }
     const dbo = db.db(dbName);
     let round = "round"+roundNumber;
-    
+
     dbo.collection("videos").findOne({ _id: username}, {fields:{_id:0, [round]:1}}, (err, result) => {
       if (err) {
         db.close();
@@ -97,7 +97,7 @@ function login(username, password, client) {
       client.emit("login","failure");
       db.close();
       return;
-    } 
+    }
     const dbo = db.db(dbName);
     dbo.collection("users").findOne({ _id: username, password: password }, (err, result) => {
       if (err) {
@@ -119,6 +119,7 @@ function login(username, password, client) {
 
 function checkToken(token, client) {
   if (!tokenMap.has(token)) {
+    console.log("token fail");
     client.emit("invalid token");
     return false;
   }
@@ -172,7 +173,7 @@ function updateBiography(token, bio, client) {
       client.emit("updateBiography","failure");
       db.close();
       return;
-    } 
+    }
     const dbo = db.db(dbName);
     dbo.collection("users").updateOne({ username: username }, {  $set: { biography: bio }},
       (err, result) => {
@@ -180,7 +181,7 @@ function updateBiography(token, bio, client) {
           db.close();
           client.emit("updateBiography","failure");
           return;
-        } 
+        }
       });
     db.close();
     client.emit("updateBiography","success");
@@ -195,7 +196,7 @@ function updateProfilePicture(token, pic, client) {
       db.close();
       client.emit("updateProfilePicture", "failure");
       return;
-    } 
+    }
     const dbo = db.db(dbName);
     dbo.collection("users").updateOne({ username: username }, { $set: {profilePicture: pic }},
       (err, result) => {
