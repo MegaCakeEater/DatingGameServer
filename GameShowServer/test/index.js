@@ -33,9 +33,16 @@ socket.on("loginFailed",() => {
 socket.on("matchSuccess",(response)=> {
   console.log(response);
 });
+socket.on("getUser", (response)=> {
+console.log(response);
+});
+socket.on("invalid token",() =>{
+console.log("invalid token");
+});
 
 socket.emit("createUser","hest","1234","yes",18);
 socket.emit("createUser","hest2","1234","yes",19);
 socket.emit("createUser","hest3","1234","yes",20);
 socket.emit("login","hest","123aaa");
 socket.emit("login","hest","1234");
+socket.emit("getUser","123", "hest");

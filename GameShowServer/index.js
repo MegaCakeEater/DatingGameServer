@@ -31,8 +31,7 @@ io.on('connection', client => {
     createUser(username, password, sex, age, client);
   });
   client.on("getUser", (token, username) => {
-    console.log("getUser " + token + " " + user);
-    getUser(token, username);
+    getUser(token, username, client);
   });
 
   client.on("login", (username, password) => {
@@ -60,7 +59,7 @@ mongoClient.connect(url, (err, db) => {
 
 
 function getVideo(token, username, roundnumber , client) {
-  checkToken(token, client)
+  if(!checkToken(token, client)) return;
   mongoClient.connect(url, (err, db) => {
     if (err) {
       db.close();
@@ -81,7 +80,7 @@ function getVideo(token, username, roundnumber , client) {
 }
 
 function match(token, client) {
-  checkToken(token, client);
+  if(!checkToken(token, client)) return;
   client.emit("match", "success");
 }
 
@@ -116,22 +115,18 @@ function login(username, password, client) {
   });
 }
 
-function checkToken(token, client) {
-
-  console.log(token);
-  console.log(tokenMap);
-  console.log(!tokenMap.has(token));
+function checkToken(token, client, callback) {
   if (!tokenMap.has(token)) {
-    console.log("tockenajdsj");
     client.emit("invalid token");
-    throw new Error("invalid token");
+    return false;
   }
+  return true;
 }
 
 
 function handleVideoUpload(token, roundNumber, data, client) {
+  if(!checkToken(token, client)) return;
   mongoClient.connect(url, (err, db) => {
-    checkToken(token, client);
     let username = tokenMap.get(token);
     if (err) {
       client.emit("uploadFile","failure");
@@ -167,7 +162,7 @@ function createUser(username, password, sex, age, client) {
 }
 
 function updateBiography(token, bio) {
-  checkToken(token);
+  if(!checkToken(token, client)) return;
   let username = tokenMap.get(token);
   mongoClient.connect(url, (err, db) => {
     if (err) {
@@ -190,7 +185,7 @@ function updateBiography(token, bio) {
 }
 
 function updateProfilePicture(token, pic) {
-  checkToken(token);
+  if(!checkToken(token, client)) return;
   let username = tokenMap.get(token);
   mongoClient.connect(url, (err, db) => {
     if (err) {
@@ -213,7 +208,7 @@ function updateProfilePicture(token, pic) {
 }
 
 function getUser(token, user, client) {
-  checkToken(token);
+  if(!checkToken(token, client)) return;
   mongoClient.connect(url, (err, db) => {
     if (err) {
       db.close();
@@ -221,7 +216,7 @@ function getUser(token, user, client) {
       throw err;
     }
     const dbo = db.db(dbName);
-    dbo.collection("users").findOne({ _username: user }, (err, result) => {
+    dbo.collection("users").findOne({ username: user }, (err, result) => {
       if (err) {
         db.close();
         client.emit("getUser", "failure");
