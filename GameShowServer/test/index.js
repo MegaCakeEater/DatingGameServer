@@ -38,3 +38,4 @@ socket.emit("createUser","hest","1234","yes",18);
 socket.emit("createUser","hest2","1234","yes",19);
 socket.emit("createUser","hest3","1234","yes",20);
 socket.emit("login","hest","123aaa");
+socket.emit("login","hest","1234");

@@ -36,7 +36,6 @@ io.on('connection', client => {
   });
 
   client.on("login", (username, password) => {
-    console.log(username);
     login(username, password, client);
   });
   client.on("match", (token) => {
@@ -64,12 +63,14 @@ function getVideo(token, username, roundnumber , client) {
   checkToken(token, client)
   mongoClient.connect(url, (err, db) => {
     if (err) {
+      db.close();
       client.emit("getVideoFailed");
       throw err;
     }
     const dbo = db.db(dbName);
     dbo.collection("videos").findOne({ username: username, roundNumber:roundnumber }, (err, result) => {
       if (err) {
+        db.close();
         client.emit("getVideoFailed");
         throw err;
       }
@@ -90,24 +91,38 @@ function generateUUID() {
 
 function login(username, password, client) {
   mongoClient.connect(url, (err, db) => {
-    if (err) throw err;
+    if (err) {
+      client.emit("login");
+      db.close();
+      throw err;
+    } 
     const dbo = db.db(dbName);
-    dbo.collection("users").findOne({ _username: username, _password: password }, (err, result) => {
+    dbo.collection("users").findOne({ username: username, password: password }, (err, result) => {
       if (err) {
-        client.emit("loginFailed");
+        client.emit("login");
         db.close();
         throw err;
-      } 
+      }
       db.close();
-      let token = generateUUID();
-      tokenMap.set(token, username);
-      client.emit("loginSuccess", token);
+      if(result) {
+        let token = generateUUID();
+        tokenMap.set(token, username);
+        client.emit("login", token);
+      } else {
+        client.emit("login");
+      }
+      db.close();
     });
   });
 }
 
 function checkToken(token, client) {
+
+  console.log(token);
+  console.log(tokenMap);
+  console.log(!tokenMap.has(token));
   if (!tokenMap.has(token)) {
+    console.log("tockenajdsj");
     client.emit("invalid token");
     throw new Error("invalid token");
   }
@@ -160,13 +175,13 @@ function updateBiography(token, bio) {
     dbo.collection("users").updateOne({ username: username }, { biography: bio },
       (err, result) => {
         if (err) {
-          client.emit("updateBiographyFailed");
           db.close();
+          client.emit("updateBiographyFailed");
           throw err;
         } 
-        client.emit("updateBiographySuccess");
       });
     db.close();
+    client.emit("updateBiographySuccess");
   });
 }
 
@@ -179,22 +194,31 @@ function updateProfilePicture(token, pic) {
     dbo.collection("users").updateOne({ username: username }, { profilePicture: pic },
       (err, result) => {
         if (err) {
+          db.close();
           client.emit("updateProfilePictureFailed");
           throw err;
         }
-        client.emit("updateProfilePictureSuccess");
       });
     db.close();
+    client.emit("updateProfilePictureSuccess");
   });
 }
 
 function getUser(token, user, client) {
   checkToken(token);
   mongoClient.connect(url, (err, db) => {
-    if (err) throw err;
+    if (err) {
+      db.close();
+      client.emit("getUserFailed");
+      throw err;
+    }
     const dbo = db.db(dbName);
     dbo.collection("users").findOne({ _username: user }, (err, result) => {
-      if (err) client.emit("getUserFailed");
+      if (err) {
+        db.close();
+        client.emit("getUserFailed");
+        throw err;
+      }
       db.close();
       client.emit("getUserSuccess", result);
     });
