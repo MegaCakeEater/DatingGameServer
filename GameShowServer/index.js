@@ -112,8 +112,8 @@ function createUser(username, password, sex, age, client) {
     const dbo = db.db(dbName);
     dbo.collection("users").insertOne({ username: username, password: password, sex: sex, age: age },
       (err, result) => {
-        if (err) client.emit("createUserFailed");
-        client.emit("createUserSuccess");
+        if (err) client.emit("register","false");
+        client.emit("register","true");
       });
     db.close();
   });
