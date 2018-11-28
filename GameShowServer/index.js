@@ -18,7 +18,7 @@ io.on('connection', client => {
   });
   client.on('disconnect', () => { //do nothing
   });
-  client.on('uploadFile', (id, data) => {
+  client.on("uploadFile", (id, data) => {
     console.log(id);
     handleVideoUpload(id, data, client)
   });
@@ -35,12 +35,19 @@ io.on('connection', client => {
     getUser(token, username);
   });
 
-  client.on('login', (username, password) => {
+  client.on("login", (username, password) => {
     console.log(username);
     login(username, password, client);
-  })
-
-
+  });
+  client.on("match", (token) => {
+    match(token, client);
+  });
+  client.on("updateBiography", (token, bio) => { //todo
+    updateBiography(token, bio);
+  });
+  client.on("updateProfilePicture", (token, pic) => { //todo
+    updateProfilePicture(token, pic);
+  });
 });
 server.listen(port);
 
@@ -67,7 +74,8 @@ function getVideo(token, id /*userId, roundNumber*/, client) {//TODO jeg ved ikk
 }
 
 function match(token, client) {
-
+  checkToken(token, client);
+  client.emit("matchSuccess", "aaahaahaha");
 }
 
 function generateUUID() {
@@ -79,7 +87,7 @@ function login(username, password, client) {
     if (err) throw err;
     const dbo = db.db(dbName);
     dbo.collection("users").findOne({ _username: username, _password: password }, (err, result) => {
-      if (err) return "Login Unsucessful";
+      if (err) client.emit("loginFailed");
       db.close();
       let token = generateUUID();
       tokenMap.set(token, username);
@@ -89,18 +97,23 @@ function login(username, password, client) {
 }
 
 function checkToken(token, client) {
-  if(!tokenMap.has(token)) {
+  if (!tokenMap.has(token)) {
     client.emit("invalid token");
     throw new Error("invalid token");
   }
 }
 
 
-function handleVideoUpload(id, data, client) {
+function handleVideoUpload(token, roundNumber, data, client) {
   mongoClient.connect(url, (err, db) => {
-    if (err) throw err;
+    checkToken(token, client);
+    let username = tokenMap.get(token);
+    if (err) {
+      client.emit("uploadFailure");
+      throw err;
+    } 
     const dbo = db.db(dbName);
-    dbo.collection("videos").update({ _id: id }, { binary: data }, { upsert: true });
+    dbo.collection("videos").update({ username: username, roundNumber: roundNumber }, {video: data }, { upsert: true });
     db.close();
     client.emit("uploadSuccess");
   });
@@ -127,7 +140,7 @@ function getUser(token, user, client) {
     dbo.collection("users").findOne({ _username: user }, (err, result) => {
       if (err) client.emit("getUserFailed");
       db.close();
-      client.emit("getUserSuccess",result);
+      client.emit("getUserSuccess", result);
     });
   });
 }
