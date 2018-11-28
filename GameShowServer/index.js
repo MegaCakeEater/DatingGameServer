@@ -14,23 +14,21 @@ const url = "mongodb://localhost:27017/";
 let tokenMap = new Map();
 
 io.on('connection', client => {
-  client.on('event', data => { /* … */
+  client.on('event', data => { //do nothing
   });
-  client.on('disconnect', () => { /* … */
+  client.on('disconnect', () => { //do nothing
   });
   client.on('uploadFile', (id, data) => {
     console.log(id);
-    handleVideoUpload(id, data)
+    handleVideoUpload(id, data, client)
   });
-  client.on("downloadFile", (id) => {
+  client.on("downloadFile", (id, token) => {
     console.log(id);
-    getVideo("notImplemented", id, client);
+    getVideo(token, id, client);
   });
   client.on("createUser", (username, password, sex, age) => {
     console.log("createUser " + username + " " + password + " " + sex + " " + age);
-    createUser(username, password, sex, age, (success) => {
-      client.emit('response', success);
-    });
+    createUser(username, password, sex, age, client);
   });
   client.on("getUser", (token, username) => {
     console.log("getUser " + token + " " + user);
@@ -39,8 +37,7 @@ io.on('connection', client => {
 
   client.on('login', (username, password) => {
     console.log(username);
-    login(username, password);
-    client.emit("login", "{'response':'success'}"); //TODO skal nok gøre noget
+    login(username, password, client);
   })
 
 
@@ -57,20 +54,19 @@ mongoClient.connect(url, (err, db) => {
 
 
 function getVideo(token, id /*userId, roundNumber*/, client) {//TODO jeg ved ikke om det ikke er nemmere, at klienten har videonavn, i forhold til userid og roundnumber
+  checkToken(token, client)
   mongoClient.connect(url, (err, db) => {
     if (err) throw err;
     const dbo = db.db(dbName);
     dbo.collection("videos").findOne({ _id: id }, (err, result) => {
       if (err) throw err;
-      console.log("found");
       db.close();
-      console.log(result.binary.buffer);
       client.emit("download", result.binary.buffer);
     });
   });
 }
 
-function match(token) {
+function match(token, client) {
 
 }
 
@@ -78,8 +74,7 @@ function generateUUID() {
   return '_' + Math.random().toString(36).substr(2, 9);
 }
 
-function login(username, password, successCallback) {
-  //check credentials
+function login(username, password, client) {
   mongoClient.connect(url, (err, db) => {
     if (err) throw err;
     const dbo = db.db(dbName);
@@ -88,47 +83,51 @@ function login(username, password, successCallback) {
       db.close();
       let token = generateUUID();
       tokenMap.set(token, username);
-      successCallback(true);
+      client.emit("loginSuccess", token);
     });
   });
 }
 
-function checkToken(token) {
-  //if not good throw err else do nothing, maybe maintain tokens
+function checkToken(token, client) {
+  if(!tokenMap.has(token)) {
+    client.emit("invalid token");
+    throw new Error("invalid token");
+  }
 }
 
 
-function handleVideoUpload(id, data) {
+function handleVideoUpload(id, data, client) {
   mongoClient.connect(url, (err, db) => {
     if (err) throw err;
     const dbo = db.db(dbName);
     dbo.collection("videos").update({ _id: id }, { binary: data }, { upsert: true });
     db.close();
+    client.emit("uploadSuccess");
   });
 }
 
-function createUser(username, password, sex, age, callback) {
+function createUser(username, password, sex, age, client) {
   mongoClient.connect(url, (err, db) => {
     if (err) throw err;
     const dbo = db.db(dbName);
     dbo.collection("users").insertOne({ username: username, password: password, sex: sex, age: age },
       (err, result) => {
-        if (err) callback(false);
-        callback(true);
+        if (err) client.emit("createUserFailed");
+        client.emit("createUserSuccess");
       });
     db.close();
   });
 }
 
-function getUser(token, user) {
+function getUser(token, user, client) {
   checkToken(token);
   mongoClient.connect(url, (err, db) => {
     if (err) throw err;
     const dbo = db.db(dbName);
     dbo.collection("users").findOne({ _username: user }, (err, result) => {
-      if (err) return {};
+      if (err) client.emit("getUserFailed");
       db.close();
-      return result;
+      client.emit("getUserSuccess",result);
     });
   });
 }

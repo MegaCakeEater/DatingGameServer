@@ -3,8 +3,11 @@ const host = 'localhost';
 const port = 3000;
 var fs = require('fs');
 const socket = io('http://localhost:3000');
-socket.on('response', data => {
-  console.log(data);
+socket.on("createUserSuccess", () => {
+  console.log("succ");
+});
+socket.on("createUserFailed", () => {
+  console.log("fail");
 });
 // fs.readdir('testFiles',(err, files) => {
 //   files.forEach(element => {
@@ -16,4 +19,4 @@ socket.on('response', data => {
 //     });
 //   });
 // });
-socket.emit("createUser","hest","1234","yes",18);
+socket.emit("createUser","token","hest","1234","yes",18);
