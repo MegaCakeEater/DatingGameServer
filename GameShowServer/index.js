@@ -24,7 +24,7 @@ io.on('connection', client => {
   });
   client.on("downloadFile", (token, username, roundnumber) => {
     console.log(token);
-    getVideo(token, token, username, roundnumber, client);
+    getVideo(token, username, roundnumber, client);
   });
   client.on("createUser", (username, password, sex, age) => {
     console.log("createUser " + username + " " + password + " " + sex + " " + age);
