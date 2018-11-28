@@ -22,7 +22,7 @@ io.on('connection', client => {
     console.log("asd");
     handleVideoUpload(token, roundnumber, data, client)
   });
-  client.on("downloadFile", (token, username, roundNumber) => {
+  client.on("getVideo", (token, username, roundNumber) => {
     getVideo(token, username, roundNumber, client);
   });
   client.on("createUser", (username, password, sex, age) => {
@@ -58,6 +58,7 @@ mongoClient.connect(url, (err, db) => {
 
 
 function getVideo(token, username, roundNumber, client) {
+  console.log("asdas");
   if(!checkToken(token, client)) return;
   mongoClient.connect(url, (err, db) => {
     if (err) {
@@ -67,14 +68,16 @@ function getVideo(token, username, roundNumber, client) {
     }
     const dbo = db.db(dbName);
     let round = "round"+roundNumber;
-    dbo.collection("videos").findOne({ _id: username}, (err, result) => {
+    
+    dbo.collection("videos").findOne({ _id: username}, {fields:{_id:0, [round]:1}}, (err, result) => {
       if (err) {
         db.close();
         client.emit("getVideo","failure");
         return;
       }
       db.close();
-      client.emit("getVideo", result.round.binary.buffer);
+      console.log(result);
+      client.emit("getVideo", result[round]);
     });
   });
 }
@@ -134,7 +137,7 @@ function handleVideoUpload(token, roundNumber, data, client) {
     }
     const dbo = db.db(dbName);
     let round ="round"+roundNumber;
-    dbo.collection("videos").update({ _id: username}, { round: data }, { upsert: true });
+    dbo.collection("videos").updateOne({ _id: username}, { $set: { [round]: data }}, { upsert: true });
     db.close();
     client.emit("uploadFile","success");
   });
@@ -171,7 +174,7 @@ function updateBiography(token, bio, client) {
       return;
     } 
     const dbo = db.db(dbName);
-    dbo.collection("users").updateOne({ username: username }, { biography: bio },
+    dbo.collection("users").updateOne({ username: username }, {  $set: { biography: bio }},
       (err, result) => {
         if (err) {
           db.close();
@@ -194,7 +197,7 @@ function updateProfilePicture(token, pic, client) {
       return;
     } 
     const dbo = db.db(dbName);
-    dbo.collection("users").updateOne({ username: username }, { profilePicture: pic },
+    dbo.collection("users").updateOne({ username: username }, { $set: {profilePicture: pic }},
       (err, result) => {
         if (err) {
           db.close();
