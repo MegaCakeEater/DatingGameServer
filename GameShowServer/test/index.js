@@ -2,11 +2,43 @@ const io = require('socket.io-client')
 const host = 'localhost';
 const port = 3000;
 var fs = require('fs');
-var myToken;
+var tokens = [];
+var userMap = new Map();
 const socket = io('http://localhost:3000');
 
+socket.on("match", (response) => {
+  console.log("match " + response);
+});
 
-socket.on("createUser", (response) => {
+socket.on("login", (response) => {
+  if(tokens.push(response) == 6) {
+    tokens.forEach((token) => {
+      socket.emit("match", token, true);
+    });
+    socket.emit("match", tokens[5], false);
+  }
+  
+});
+
+socket.on("inQueue", (response) => {
+  console.log("inQueue " + response);
+})
+
+socket.emit("createUser", "hest", "1234", "yes", 18);
+socket.emit("createUser", "hest2", "1234", "yes", 19);
+socket.emit("createUser", "hest3", "1234", "yes", 20);
+socket.emit("createUser", "hest4", "1234", "yes", 21);
+socket.emit("createUser", "hest5", "1234", "yes", 22);
+socket.emit("createUser", "hest6", "1234", "yes", 23);
+
+socket.emit("login", "hest", "1234");
+socket.emit("login", "hest2", "1234");
+socket.emit("login", "hest3", "1234");
+socket.emit("login", "hest4", "1234");
+socket.emit("login", "hest5", "1234");
+socket.emit("login", "hest6", "1234");
+
+/* socket.on("createUser", (response) => {
   console.log("createUser " + response);
 });
 socket.on("login", (token) => {
@@ -49,4 +81,4 @@ socket.on("getVideo", (response) => {
 socket.emit("createUser", "hest", "1234", "yes", 18);
 socket.emit("createUser", "hest2", "1234", "yes", 19);
 socket.emit("createUser", "hest3", "1234", "yes", 20);
-socket.emit("login", "hest", "1234");
+socket.emit("login", "hest", "1234"); */

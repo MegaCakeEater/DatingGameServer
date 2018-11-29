@@ -1,17 +1,16 @@
-/* så der er et par design ting vi lige skal have fundet ud af
-   i forhold til hvordan interaktionen mellem klient og server skal fungere,
-   hvilke ting der skal håndteres af serveren
-   vi skal også have aftalt en data model.
-   Jeg har high-level skitseret de metoder, jeg går ud fra SKAL være der.
-*/
-
 const server = require('http').createServer();
 const io = require('socket.io')(server);
 const port = 3000;
 const dbName = "GameShowDatingAppDB";
 const mongoClient = require('mongodb').MongoClient;
 const url = "mongodb://localhost:27017/";
-let tokenMap = new Map();
+const tokenMap = new Map();
+const judgerQueue = [];
+const nonJudgerQueue = []; //TODO: hvad fuck kalder vi lige deltagerne?
+const judgersNeededToPlay = 5;
+const nonJudgersNeededToPlay = 1;
+
+
 
 io.on('connection', client => {
   client.on('event', data => { //do nothing
@@ -36,13 +35,13 @@ io.on('connection', client => {
   client.on("login", (username, password) => {
     login(username, password, client);
   });
-  client.on("match", (token) => {
-    match(token, client);
+  client.on("match", (token, judger) => {
+    match(token, judger, client);
   });
-  client.on("updateBiography", (token, bio) => { //todo
+  client.on("updateBiography", (token, bio) => {
     updateBiography(token, bio, client);
   });
-  client.on("updateProfilePicture", (token, pic) => { //todo
+  client.on("updateProfilePicture", (token, pic) => {
     updateProfilePicture(token, pic, client);
   });
 });
@@ -58,33 +57,65 @@ mongoClient.connect(url, (err, db) => {
 
 
 function getVideo(token, username, roundNumber, client) {
-  console.log("asdas");
-  if(!checkToken(token, client)) return;
+  if (!checkToken(token, client)) return;
   mongoClient.connect(url, (err, db) => {
     if (err) {
       db.close();
-      client.emit("getVideo","failure");
+      client.emit("getVideo", "failure");
       return;
     }
     const dbo = db.db(dbName);
-    let round = "round"+roundNumber;
+    let round = "round" + roundNumber;
 
-    dbo.collection("videos").findOne({ _id: username}, {fields:{_id:0, [round]:1}}, (err, result) => {
+    dbo.collection("videos").findOne({ _id: username }, { fields: { _id: 0, [round]: 1 } }, (err, result) => {
       if (err) {
         db.close();
-        client.emit("getVideo","failure");
+        client.emit("getVideo", "failure");
         return;
       }
       db.close();
-      console.log(result);
       client.emit("getVideo", result[round]);
     });
   });
 }
 
-function match(token, client) {
-  if(!checkToken(token, client)) return;
-  client.emit("match", "success");
+function match(token, judger, client) {
+  if (!checkToken(token, client)) return;
+  //TODO: DET BURDE VIRKE SÅDAN HER, MEN MAN KAN IKKE TESTE MED KUN EN KLIENT SÅ
+  /* if (judger) {
+    if (!judgerQueue.includes(client)) judgerQueue.push(client);
+    client.emit("inQueue", "success");
+  } else {
+    if (!nonJudgerQueue.includes(client)) nonJudgerQueue.push(client);
+    client.emit("inQueue", "success");
+  } */
+  if (judger) {
+    judgerQueue.push(client);
+    client.emit("inQueue", "success");
+  } else {
+    nonJudgerQueue.push(client);
+    client.emit("inQueue", "success");
+  }
+  
+  if(canPlay()) {
+    startGame();
+  }
+}
+
+function canPlay() {
+  return nonJudgerQueue.length >= nonJudgersNeededToPlay && judgerQueue.length >= judgersNeededToPlay;
+}
+
+function startGame() {
+  const judgers = judgerQueue.splice(0, judgersNeededToPlay);
+  const nonJudgers = nonJudgerQueue.splice(0, nonJudgersNeededToPlay);
+
+  judgers.forEach((judger) => {
+    judger.emit("match", "success");
+  });
+  nonJudgers.forEach((nonJudger) => {
+    nonJudger.emit("match", "success");
+  });
 }
 
 function generateUUID() {
@@ -94,23 +125,23 @@ function generateUUID() {
 function login(username, password, client) {
   mongoClient.connect(url, (err, db) => {
     if (err) {
-      client.emit("login","failure");
+      client.emit("login", "failure");
       db.close();
       return;
     }
     const dbo = db.db(dbName);
     dbo.collection("users").findOne({ _id: username, password: password }, (err, result) => {
       if (err) {
-        client.emit("login","failure");
+        client.emit("login", "failure");
         db.close();
         return;
       }
-      else if(result != null) {
+      else if (result != null) {
         let token = generateUUID();
         tokenMap.set(token, username);
         client.emit("login", token);
       } else {
-        client.emit("login","failure");
+        client.emit("login", "failure");
       }
       db.close();
     });
@@ -128,26 +159,26 @@ function checkToken(token, client) {
 
 
 function handleVideoUpload(token, roundNumber, data, client) {
-  if(!checkToken(token, client)) return;
+  if (!checkToken(token, client)) return;
   mongoClient.connect(url, (err, db) => {
     let username = tokenMap.get(token);
     if (err) {
       db.close();
-      client.emit("uploadFile","failure");
+      client.emit("uploadFile", "failure");
       return;
     }
     const dbo = db.db(dbName);
-    let round ="round"+roundNumber;
-    dbo.collection("videos").updateOne({ _id: username}, { $set: { [round]: data }}, { upsert: true });
+    let round = "round" + roundNumber;
+    dbo.collection("videos").updateOne({ _id: username }, { $set: { [round]: data } }, { upsert: true });
     db.close();
-    client.emit("uploadFile","success");
+    client.emit("uploadFile", "success");
   });
 }
 
 function createUser(username, password, sex, age, client) {
   mongoClient.connect(url, (err, db) => {
     if (err) {
-      client.emit("createUser","failure");
+      client.emit("createUser", "failure");
       db.close();
       return;
     }
@@ -155,41 +186,41 @@ function createUser(username, password, sex, age, client) {
     dbo.collection("users").insertOne({ _id: username, password: password, sex: sex, age: age, biography: "", profilePicture: null },
       (err, result) => {
         if (err) {
-          client.emit("createUser","failure");
+          client.emit("createUser", "failure");
           db.close();
           return;
         }
-        client.emit("createUser","success");
+        client.emit("createUser", "success");
       });
     db.close();
   });
 }
 
 function updateBiography(token, bio, client) {
-  if(!checkToken(token, client)) return;
+  if (!checkToken(token, client)) return;
   let username = tokenMap.get(token);
   mongoClient.connect(url, (err, db) => {
     if (err) {
-      client.emit("updateBiography","failure");
+      client.emit("updateBiography", "failure");
       db.close();
       return;
     }
     const dbo = db.db(dbName);
-    dbo.collection("users").updateOne({ username: username }, {  $set: { biography: bio }},
+    dbo.collection("users").updateOne({ username: username }, { $set: { biography: bio } },
       (err, result) => {
         if (err) {
           db.close();
-          client.emit("updateBiography","failure");
+          client.emit("updateBiography", "failure");
           return;
         }
       });
     db.close();
-    client.emit("updateBiography","success");
+    client.emit("updateBiography", "success");
   });
 }
 
 function updateProfilePicture(token, pic, client) {
-  if(!checkToken(token, client)) return;
+  if (!checkToken(token, client)) return;
   let username = tokenMap.get(token);
   mongoClient.connect(url, (err, db) => {
     if (err) {
@@ -198,7 +229,7 @@ function updateProfilePicture(token, pic, client) {
       return;
     }
     const dbo = db.db(dbName);
-    dbo.collection("users").updateOne({ username: username }, { $set: {profilePicture: pic }},
+    dbo.collection("users").updateOne({ username: username }, { $set: { profilePicture: pic } },
       (err, result) => {
         if (err) {
           db.close();
@@ -212,7 +243,7 @@ function updateProfilePicture(token, pic, client) {
 }
 
 function getUser(token, user, client) {
-  if(!checkToken(token, client)) return;
+  if (!checkToken(token, client)) return;
   mongoClient.connect(url, (err, db) => {
     if (err) {
       db.close();
