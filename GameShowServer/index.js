@@ -5,10 +5,12 @@ const dbName = "GameShowDatingAppDB";
 const mongoClient = require('mongodb').MongoClient;
 const url = "mongodb://localhost:27017/";
 const tokenMap = new Map();
-const judgerQueue = [];
-const nonJudgerQueue = []; //TODO: hvad fuck kalder vi lige deltagerne?
+var judgerQueue = [];
+var nonJudgerQueue = []; //TODO: hvad fuck kalder vi lige deltagerne?
 const judgersNeededToPlay = 5;
 const nonJudgersNeededToPlay = 1;
+const activeGames = new Map();
+const unconfirmedGames = new Map();
 
 
 
@@ -37,6 +39,9 @@ io.on('connection', client => {
   });
   client.on("match", (token, judger) => {
     match(token, judger, client);
+  });
+  client.on("confirmParticipation", (token, gameId, response) => {
+    confirmParticipation(token, gameId, response);
   });
   client.on("updateBiography", (token, bio) => {
     updateBiography(token, bio, client);
@@ -81,24 +86,24 @@ function getVideo(token, username, roundNumber, client) {
 
 function match(token, judger, client) {
   if (!checkToken(token, client)) return;
+  player = { client: client, username: tokenMap.get(token), confirmed: false };
   //TODO: DET BURDE VIRKE SÅDAN HER, MEN MAN KAN IKKE TESTE MED KUN EN KLIENT SÅ
   /* if (judger) {
-    if (!judgerQueue.includes(client)) judgerQueue.push(client);
+    if (!judgerQueue.includes(client)) judgerQueue.push(player);
     client.emit("inQueue", "success");
   } else {
-    if (!nonJudgerQueue.includes(client)) nonJudgerQueue.push(client);
+    if (!nonJudgerQueue.includes(client)) nonJudgerQueue.push(player);
     client.emit("inQueue", "success");
   } */
   if (judger) {
-    judgerQueue.push(client);
+    judgerQueue.push(player);
     client.emit("inQueue", "success");
   } else {
-    nonJudgerQueue.push(client);
+    nonJudgerQueue.push(player);
     client.emit("inQueue", "success");
   }
-  
-  if(canPlay()) {
-    startGame();
+  if (canPlay()) {
+    requestGame();
   }
 }
 
@@ -106,16 +111,62 @@ function canPlay() {
   return nonJudgerQueue.length >= nonJudgersNeededToPlay && judgerQueue.length >= judgersNeededToPlay;
 }
 
-function startGame() {
+function requestGame() {
+  const gameId = generateUUID();
   const judgers = judgerQueue.splice(0, judgersNeededToPlay);
   const nonJudgers = nonJudgerQueue.splice(0, nonJudgersNeededToPlay);
 
   judgers.forEach((judger) => {
-    judger.emit("match", "success");
+    judger.client.emit("match", "success", gameId);
   });
   nonJudgers.forEach((nonJudger) => {
-    nonJudger.emit("match", "success");
+    nonJudger.client.emit("match", "success", gameId);
   });
+
+  let game = { judgers: judgers, nonJudgers: nonJudgers };
+  unconfirmedGames.set(gameId, game);
+}
+
+function confirmParticipation(token, gameId, reponse) {
+  checkToken(token);
+  const username = tokenMap.get(token);
+  const game = unconfirmedGames.get(gameId);
+  if(game == null) {
+    return;
+  }
+  if(reponse == false) {
+    unconfirmedGames.delete(gameId);
+      game.judgers.forEach((judger) => {
+      if(judger.username != username) judgerQueue.unshift(judger);
+    });
+    game.nonJudgers.forEach((nonJudger) => {
+      if(nonJudger.username != username) nonJudgerQueue.unshift(nonJudger);
+    });
+  } else {
+    game.judgers.forEach((judger) => {
+      if(judger.username == username) {
+        judger.confirmed = true;
+      }
+    });
+    if(checkGameCanStart(game)) {
+      startGame(game, gameId);
+    }
+  }
+  judgerQueue.forEach((judger) => {
+    console.log(judger.username);
+  });
+
+  nonJudgerQueue.forEach((nonJudger) => {
+    console.log(nonJudger.username);
+  });
+}
+
+function startGame(game, gameId) {
+
+}
+
+function checkGameCanStart(game) {
+
 }
 
 function generateUUID() {
@@ -183,7 +234,7 @@ function createUser(username, password, sex, age, client) {
       return;
     }
     const dbo = db.db(dbName);
-    dbo.collection("users").insertOne({ _id: username, password: password, sex: sex, age: age, biography: "", profilePicture: null },
+    dbo.collection("users").insertOne({ _id: username, password: password, sex: sex, age: age, biography: null, profilePicture: null },
       (err, result) => {
         if (err) {
           client.emit("createUser", "failure");

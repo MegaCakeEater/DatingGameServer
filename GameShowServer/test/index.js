@@ -6,8 +6,10 @@ var tokens = [];
 var userMap = new Map();
 const socket = io('http://localhost:3000');
 
-socket.on("match", (response) => {
+socket.on("match", (response, gameId) => {
   console.log("match " + response);
+  console.log("match2 " + gameId);
+  socket.emit("confirmParticipation", tokens[0], gameId, false);
 });
 
 socket.on("login", (response) => {
