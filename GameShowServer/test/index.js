@@ -9,7 +9,13 @@ const socket = io('http://localhost:3000');
 socket.on("match", (response, gameId) => {
   console.log("match " + response);
   console.log("match2 " + gameId);
-  socket.emit("confirmParticipation", tokens[0], gameId, false);
+
+  tokens.forEach((token) => {
+    socket.emit("confirmParticipation", token, gameId, true);
+  });
+});
+socket.on("startGame", response => {
+  console.log("startGame " + response);
 });
 
 socket.on("login", (response) => {
@@ -17,9 +23,8 @@ socket.on("login", (response) => {
     tokens.forEach((token) => {
       socket.emit("match", token, true);
     });
-    socket.emit("match", tokens[5], false);
+    socket.emit("match", tokens[1], false);
   }
-  
 });
 
 socket.on("inQueue", (response) => {

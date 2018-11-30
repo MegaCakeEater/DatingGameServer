@@ -20,14 +20,12 @@ io.on('connection', client => {
   client.on('disconnect', () => { //do nothing
   });
   client.on("uploadFile", (token, roundnumber, data) => {
-    console.log("asd");
     handleVideoUpload(token, roundnumber, data, client)
   });
   client.on("getVideo", (token, username, roundNumber) => {
     getVideo(token, username, roundNumber, client);
   });
   client.on("createUser", (username, password, sex, age) => {
-    console.log("createUser " + username + " " + password + " " + sex + " " + age);
     createUser(username, password, sex, age, client);
   });
   client.on("getUser", (token, username) => {
@@ -148,25 +146,38 @@ function confirmParticipation(token, gameId, reponse) {
         judger.confirmed = true;
       }
     });
+    game.nonJudgers.forEach((nonJudger) => {
+      if(nonJudger.username == username) {
+        nonJudger.confirmed = true;
+      }
+    });
     if(checkGameCanStart(game)) {
+      activeGames.set(gameId, game);
+      unconfirmedGames.delete(gameId);
       startGame(game, gameId);
     }
   }
-  judgerQueue.forEach((judger) => {
-    console.log(judger.username);
-  });
-
-  nonJudgerQueue.forEach((nonJudger) => {
-    console.log(nonJudger.username);
-  });
 }
 
 function startGame(game, gameId) {
+  console.log(gameId + " starting");
+  game.judgers.forEach(judger => {
+    judger.client.emit("startGame", gameId);
+  });
+  game.nonJudgers.forEach(nonJudger => {
+    nonJudger.client.emit("startGame", gameId);
+  });
 
 }
 
 function checkGameCanStart(game) {
-
+  judgersReady = game.judgers.filter((judger) => {
+    return judger.confirmed;
+  }).length;
+  nonJudgersReady = game.nonJudgers.filter((nonJudger) => {
+    return nonJudger.confirmed;
+  }).length;
+  return judgersReady == judgersNeededToPlay && nonJudgersReady == nonJudgersNeededToPlay;
 }
 
 function generateUUID() {
