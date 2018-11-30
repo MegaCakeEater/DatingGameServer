@@ -55,7 +55,6 @@ io.on('connection', client => {
     client.on("videoOver", (token, gameId) => {
         videoOver(token, gameId, client);
     });
-    client.on("getProfilePicture")
 });
 server.listen(port);
 
