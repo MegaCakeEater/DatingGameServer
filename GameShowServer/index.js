@@ -11,316 +11,390 @@ const judgersNeededToPlay = 5;
 const nonJudgersNeededToPlay = 1;
 const activeGames = new Map();
 const unconfirmedGames = new Map();
+const totalRounds = 3;
 
 
 
 io.on('connection', client => {
-  client.on('event', data => { //do nothing
-  });
-  client.on('disconnect', () => { //do nothing
-  });
-  client.on("uploadFile", (token, roundnumber, data) => {
-    handleVideoUpload(token, roundnumber, data, client)
-  });
-  client.on("getVideo", (token, username, roundNumber) => {
-    getVideo(token, username, roundNumber, client);
-  });
-  client.on("createUser", (username, password, sex, age) => {
-    createUser(username, password, sex, age, client);
-  });
-  client.on("getUser", (token, username) => {
-    getUser(token, username, client);
-  });
+    client.on('event', data => { //do nothing
+    });
+    client.on('disconnect', () => { //do nothing
+    });
+    client.on("uploadFile", (token, roundnumber, data) => {
+        handleVideoUpload(token, roundnumber, data, client)
+    });
+    client.on("getVideo", (token, username, roundNumber) => {
+        getVideo(token, username, roundNumber, client);
+    });
+    client.on("createUser", (username, password, sex, age) => {
+        createUser(username, password, sex, age, client);
+    });
+    client.on("getUser", (token, username) => {
+        getUser(token, username, client);
+    });
 
-  client.on("login", (username, password) => {
-    login(username, password, client);
-  });
-  client.on("match", (token, judger) => {
-    match(token, judger, client);
-  });
-  client.on("confirmParticipation", (token, gameId, response) => {
-    confirmParticipation(token, gameId, response);
-  });
-  client.on("updateBiography", (token, bio) => {
-    updateBiography(token, bio, client);
-  });
-  client.on("updateProfilePicture", (token, pic) => {
-    updateProfilePicture(token, pic, client);
-  });
+    client.on("login", (username, password) => {
+        login(username, password, client);
+    });
+    client.on("match", (token, judger) => {
+        match(token, judger, client);
+    });
+    client.on("confirmParticipation", (token, gameId, response) => {
+        confirmParticipation(token, gameId, response);
+    });
+    client.on("updateBiography", (token, bio) => {
+        updateBiography(token, bio, client);
+    });
+    client.on("updateProfilePicture", (token, pic) => {
+        updateProfilePicture(token, pic, client);
+    });
+    client.on("vote", (token, gameId, timeStamp) => {
+        vote(token, gameId, timeStamp, client);
+    });
+    client.on("comment", (token, gameId, comment) => {
+        comments(token, gameId, comment, client);
+    });
+    client.on("videoOver", (token, gameId) => {
+        videoOver(token, gameId, client);
+    });
+    client.on("getProfilePicture")
 });
 server.listen(port);
 
 mongoClient.connect(url, (err, db) => {
-  if (err) return;
-  var dbo = db.db(dbName);
-  dbo.createCollection("videos", function (err, res) {
     if (err) return;
-  });
+    var dbo = db.db(dbName);
+    dbo.createCollection("videos", function (err, res) {
+        if (err) return;
+    });
 });
 
 
 function getVideo(token, username, roundNumber, client) {
-  if (!checkToken(token, client)) return;
-  mongoClient.connect(url, (err, db) => {
-    if (err) {
-      db.close();
-      client.emit("getVideo", "failure");
-      return;
-    }
-    const dbo = db.db(dbName);
-    let round = "round" + roundNumber;
+    if (!checkToken(token, client)) return;
+    mongoClient.connect(url, (err, db) => {
+        if (err) {
+            db.close();
+            client.emit("getVideo", "failure");
+            return;
+        }
+        const dbo = db.db(dbName);
+        let round = "round" + roundNumber;
 
-    dbo.collection("videos").findOne({ _id: username }, { fields: { _id: 0, [round]: 1 } }, (err, result) => {
-      if (err) {
-        db.close();
-        client.emit("getVideo", "failure");
-        return;
-      }
-      db.close();
-      client.emit("getVideo", result[round]);
+        dbo.collection("videos").findOne({ _id: username }, { fields: { _id: 0, [round]: 1 } }, (err, result) => {
+            if (err) {
+                db.close();
+                client.emit("getVideo", "failure");
+                return;
+            }
+            db.close();
+            client.emit("getVideo", result[round]);
+        });
     });
-  });
 }
 
 function match(token, judger, client) {
-  if (!checkToken(token, client)) return;
-  player = { client: client, username: tokenMap.get(token), confirmed: false };
-  //TODO: DET BURDE VIRKE SÅDAN HER, MEN MAN KAN IKKE TESTE MED KUN EN KLIENT SÅ
-  /* if (judger) {
-    if (!judgerQueue.includes(client)) judgerQueue.push(player);
-    client.emit("inQueue", "success");
-  } else {
-    if (!nonJudgerQueue.includes(client)) nonJudgerQueue.push(player);
-    client.emit("inQueue", "success");
-  } */
-  if (judger) {
-    judgerQueue.push(player);
-    client.emit("inQueue", "success");
-  } else {
-    nonJudgerQueue.push(player);
-    client.emit("inQueue", "success");
-  }
-  if (canPlay()) {
-    requestGame();
-  }
+    if (!checkToken(token, client)) return;
+    player = { client: client, username: tokenMap.get(token), confirmed: false, hasWatched: false };
+    //TODO: DET BURDE VIRKE SÅDAN HER, MEN MAN KAN IKKE TESTE MED KUN EN KLIENT SÅ
+    /* if (judger) {
+      if (!judgerQueue.includes(client)) judgerQueue.push(player);
+      client.emit("inQueue", "success");
+    } else {
+      if (!nonJudgerQueue.includes(client)) nonJudgerQueue.push(player);
+      client.emit("inQueue", "success");
+    } */
+    if (judger) {
+        judgerQueue.push(player);
+        client.emit("inQueue", "success");
+    } else {
+        nonJudgerQueue.push(player);
+        client.emit("inQueue", "success");
+    }
+    if (canPlay()) {
+        requestGame();
+    }
 }
 
 function canPlay() {
-  return nonJudgerQueue.length >= nonJudgersNeededToPlay && judgerQueue.length >= judgersNeededToPlay;
+    return nonJudgerQueue.length >= nonJudgersNeededToPlay && judgerQueue.length >= judgersNeededToPlay;
 }
 
 function requestGame() {
-  const gameId = generateUUID();
-  const judgers = judgerQueue.splice(0, judgersNeededToPlay);
-  const nonJudgers = nonJudgerQueue.splice(0, nonJudgersNeededToPlay);
+    const gameId = generateUUID();
+    const judgers = judgerQueue.splice(0, judgersNeededToPlay);
+    const nonJudgers = nonJudgerQueue.splice(0, nonJudgersNeededToPlay);
 
-  judgers.forEach((judger) => {
-    judger.client.emit("match", "success", gameId);
-  });
-  nonJudgers.forEach((nonJudger) => {
-    nonJudger.client.emit("match", "success", gameId);
-  });
+    judgers.forEach((judger) => {
+        judger.client.emit("match", gameId);
+    });
+    nonJudgers.forEach((nonJudger) => {
+        nonJudger.client.emit("match", gameId);
+    });
 
-  let game = { judgers: judgers, nonJudgers: nonJudgers };
-  unconfirmedGames.set(gameId, game);
+    let game = { judgers: judgers, nonJudgers: nonJudgers, round: 1 };
+    unconfirmedGames.set(gameId, game);
 }
 
 function confirmParticipation(token, gameId, reponse) {
-  checkToken(token);
-  const username = tokenMap.get(token);
-  const game = unconfirmedGames.get(gameId);
-  if(game == null) {
-    return;
-  }
-  if(reponse == false) {
-    unconfirmedGames.delete(gameId);
-      game.judgers.forEach((judger) => {
-      if(judger.username != username) judgerQueue.unshift(judger);
-    });
-    game.nonJudgers.forEach((nonJudger) => {
-      if(nonJudger.username != username) nonJudgerQueue.unshift(nonJudger);
-    });
-  } else {
-    game.judgers.forEach((judger) => {
-      if(judger.username == username) {
-        judger.confirmed = true;
-      }
-    });
-    game.nonJudgers.forEach((nonJudger) => {
-      if(nonJudger.username == username) {
-        nonJudger.confirmed = true;
-      }
-    });
-    if(checkGameCanStart(game)) {
-      activeGames.set(gameId, game);
-      unconfirmedGames.delete(gameId);
-      startGame(game, gameId);
+    if (!checkToken(token, client)) return;
+    const username = tokenMap.get(token);
+    const game = unconfirmedGames.get(gameId);
+    if (game == null) {
+        return;
     }
-  }
+    if (reponse == false) {
+        unconfirmedGames.delete(gameId);
+        game.judgers.forEach((judger) => {
+            if (judger.username != username) judgerQueue.unshift(judger);
+        });
+        game.nonJudgers.forEach((nonJudger) => {
+            if (nonJudger.username != username) nonJudgerQueue.unshift(nonJudger);
+        });
+    } else {
+        game.judgers.forEach((judger) => {
+            if (judger.username == username) {
+                judger.confirmed = true;
+            }
+        });
+        game.nonJudgers.forEach((nonJudger) => {
+            if (nonJudger.username == username) {
+                nonJudger.confirmed = true;
+            }
+        });
+        if (checkGameCanStart(game)) {
+            activeGames.set(gameId, game);
+            unconfirmedGames.delete(gameId);
+            startGame(game, gameId);
+        }
+    }
 }
 
 function startGame(game, gameId) {
-  console.log(gameId + " starting");
-  game.judgers.forEach(judger => {
-    judger.client.emit("startGame", gameId);
-  });
-  game.nonJudgers.forEach(nonJudger => {
-    nonJudger.client.emit("startGame", gameId);
-  });
-
+    console.log(gameId + " starting");
+    game.judgers.forEach(judger => {
+        game.nonJudgers.forEach(nonJudger => {
+            judger.client.emit("startGame", gameId, judgers.length, nonJudger.username);
+        });
+    });
+    game.nonJudgers.forEach(nonJudger => {
+        nonJudger.client.emit("startGame", gameId, judgers.length);
+    });
 }
 
 function checkGameCanStart(game) {
-  judgersReady = game.judgers.filter((judger) => {
-    return judger.confirmed;
-  }).length;
-  nonJudgersReady = game.nonJudgers.filter((nonJudger) => {
-    return nonJudger.confirmed;
-  }).length;
-  return judgersReady == judgersNeededToPlay && nonJudgersReady == nonJudgersNeededToPlay;
+    judgersReady = game.judgers.filter((judger) => {
+        return judger.confirmed;
+    }).length;
+    nonJudgersReady = game.nonJudgers.filter((nonJudger) => {
+        return nonJudger.confirmed;
+    }).length;
+    return judgersReady == judgersNeededToPlay && nonJudgersReady == nonJudgersNeededToPlay;
+}
+
+function vote(token, gameId, timeStamp, client) { //TODO: database til timestamp
+    if (!checkToken(token, client)) return;
+    const game = activeGames.get(gameId);
+    const username = tokenMap.get(token);
+    if (game == null) {
+        return;
+    }
+    game.judgers = game.judgers.filter((judger) => {
+        judger.username != username;
+    });
+    client.emit("gameUpdate", game.judgers.length, judgersNeededToPlay, game.round);
+}
+
+function comments(token, gameId, comment, client) { //TODO: gem de her comments
+    console.log("comment " + comment);
+}
+
+function videoOver(token, gameId, client) {
+    if (!checkToken(token, client)) return;
+    username = tokenMap.get(token);
+    game.judgers.forEach((judger) => {
+        if (judger.username = username) judger.hasWatched = true;
+    });
+
+    if (canGoToNextRound(game)) {
+        startNextRound(game);
+    }
+}
+
+function canGoToNextRound(game) {
+    return game.judgers.every(judge => {
+        judge.hasWatched
+    });
+}
+
+function startNextRound(game) {
+    game.round++;
+    if (checkGameOver(game)) {
+        handleGameOver(game);
+    }
+    game.judgers.forEach(judger => {
+        judger.hasWatched = false;
+        judger.client.emit("gameUpdate", game.judgers, judgersNeededToPlay, game.round);
+    });
+    game.nonJudgers.forEach(nonJudger => {
+        nonJudger.client.emit("gameUpdate", game.judgers, judgersNeededToPlay, game.round);
+    });
+}
+
+function handleGameOver(game) {
+    game.judgers.forEach(judger => {
+        judger.client.emit("gameOver");
+    });
+    game.nonJudgers.forEach(nonJudger => {
+        nonJudger.client.emit("gameOver");
+    });
+}
+
+function checkGameOver(game) {
+    return game.round > totalRounds;
 }
 
 function generateUUID() {
-  return '_' + Math.random().toString(36).substr(2, 9);
+    return '_' + Math.random().toString(36).substr(2, 9);
 }
 
 function login(username, password, client) {
-  mongoClient.connect(url, (err, db) => {
-    if (err) {
-      client.emit("login", "failure");
-      db.close();
-      return;
-    }
-    const dbo = db.db(dbName);
-    dbo.collection("users").findOne({ _id: username, password: password }, (err, result) => {
-      if (err) {
-        client.emit("login", "failure");
-        db.close();
-        return;
-      }
-      else if (result != null) {
-        let token = generateUUID();
-        tokenMap.set(token, username);
-        client.emit("login", token);
-      } else {
-        client.emit("login", "failure");
-      }
-      db.close();
+    mongoClient.connect(url, (err, db) => {
+        if (err) {
+            client.emit("login", "failure");
+            db.close();
+            return;
+        }
+        const dbo = db.db(dbName);
+        dbo.collection("users").findOne({ _id: username, password: password }, (err, result) => {
+            if (err) {
+                client.emit("login", "failure");
+                db.close();
+                return;
+            }
+            else if (result != null) {
+                let token = generateUUID();
+                tokenMap.set(token, username);
+                client.emit("login", token);
+            } else {
+                client.emit("login", "failure");
+            }
+            db.close();
+        });
     });
-  });
 }
 
 function checkToken(token, client) {
-  if (!tokenMap.has(token)) {
-    console.log("token fail");
-    client.emit("invalid token");
-    return false;
-  }
-  return true;
+    if (!tokenMap.has(token)) {
+        console.log("token fail");
+        client.emit("invalid token");
+        return false;
+    }
+    return true;
 }
 
 
 function handleVideoUpload(token, roundNumber, data, client) {
-  if (!checkToken(token, client)) return;
-  mongoClient.connect(url, (err, db) => {
-    let username = tokenMap.get(token);
-    if (err) {
-      db.close();
-      client.emit("uploadFile", "failure");
-      return;
-    }
-    const dbo = db.db(dbName);
-    let round = "round" + roundNumber;
-    dbo.collection("videos").updateOne({ _id: username }, { $set: { [round]: data } }, { upsert: true });
-    db.close();
-    client.emit("uploadFile", "success");
-  });
+    if (!checkToken(token, client)) return;
+    mongoClient.connect(url, (err, db) => {
+        let username = tokenMap.get(token);
+        if (err) {
+            db.close();
+            client.emit("uploadFile", "failure");
+            return;
+        }
+        const dbo = db.db(dbName);
+        let round = "round" + roundNumber;
+        dbo.collection("videos").updateOne({ _id: username }, { $set: { [round]: data } }, { upsert: true });
+        db.close();
+        client.emit("uploadFile", "success");
+    });
 }
 
 function createUser(username, password, sex, age, client) {
-  mongoClient.connect(url, (err, db) => {
-    if (err) {
-      client.emit("createUser", "failure");
-      db.close();
-      return;
-    }
-    const dbo = db.db(dbName);
-    dbo.collection("users").insertOne({ _id: username, password: password, sex: sex, age: age, biography: null, profilePicture: null },
-      (err, result) => {
+    mongoClient.connect(url, (err, db) => {
         if (err) {
-          client.emit("createUser", "failure");
-          db.close();
-          return;
+            client.emit("createUser", "failure");
+            db.close();
+            return;
         }
-        client.emit("createUser", "success");
-      });
-    db.close();
-  });
+        const dbo = db.db(dbName);
+        dbo.collection("users").insertOne({ _id: username, password: password, sex: sex, age: age, biography: null, profilePicture: null },
+            (err, result) => {
+                if (err) {
+                    client.emit("createUser", "failure");
+                    db.close();
+                    return;
+                }
+                client.emit("createUser", "success");
+            });
+        db.close();
+    });
 }
 
 function updateBiography(token, bio, client) {
-  if (!checkToken(token, client)) return;
-  let username = tokenMap.get(token);
-  mongoClient.connect(url, (err, db) => {
-    if (err) {
-      client.emit("updateBiography", "failure");
-      db.close();
-      return;
-    }
-    const dbo = db.db(dbName);
-    dbo.collection("users").updateOne({ username: username }, { $set: { biography: bio } },
-      (err, result) => {
+    if (!checkToken(token, client)) return;
+    let username = tokenMap.get(token);
+    mongoClient.connect(url, (err, db) => {
         if (err) {
-          db.close();
-          client.emit("updateBiography", "failure");
-          return;
+            client.emit("updateBiography", "failure");
+            db.close();
+            return;
         }
-      });
-    db.close();
-    client.emit("updateBiography", "success");
-  });
+        const dbo = db.db(dbName);
+        dbo.collection("users").updateOne({ username: username }, { $set: { biography: bio } },
+            (err, result) => {
+                if (err) {
+                    db.close();
+                    client.emit("updateBiography", "failure");
+                    return;
+                }
+            });
+        db.close();
+        client.emit("updateBiography", "success");
+    });
 }
 
 function updateProfilePicture(token, pic, client) {
-  if (!checkToken(token, client)) return;
-  let username = tokenMap.get(token);
-  mongoClient.connect(url, (err, db) => {
-    if (err) {
-      db.close();
-      client.emit("updateProfilePicture", "failure");
-      return;
-    }
-    const dbo = db.db(dbName);
-    dbo.collection("users").updateOne({ username: username }, { $set: { profilePicture: pic } },
-      (err, result) => {
+    if (!checkToken(token, client)) return;
+    let username = tokenMap.get(token);
+    mongoClient.connect(url, (err, db) => {
         if (err) {
-          db.close();
-          client.emit("updateProfilePicture", "failure");
-          return;
+            db.close();
+            client.emit("updateProfilePicture", "failure");
+            return;
         }
-      });
-    db.close();
-    client.emit("updateProfilePicture", "success");
-  });
+        const dbo = db.db(dbName);
+        dbo.collection("users").updateOne({ username: username }, { $set: { profilePicture: pic } },
+            (err, result) => {
+                if (err) {
+                    db.close();
+                    client.emit("updateProfilePicture", "failure");
+                    return;
+                }
+            });
+        db.close();
+        client.emit("updateProfilePicture", "success");
+    });
 }
 
 function getUser(token, user, client) {
-  if (!checkToken(token, client)) return;
-  mongoClient.connect(url, (err, db) => {
-    if (err) {
-      db.close();
-      client.emit("getUser", "failure");
-      return;
-    }
-    const dbo = db.db(dbName);
-    dbo.collection("users").findOne({ _id: user }, (err, result) => {
-      if (err) {
-        db.close();
-        client.emit("getUser", "failure");
-        return;
-      }
-      db.close();
-      client.emit("getUser", result);
+    if (!checkToken(token, client)) return;
+    mongoClient.connect(url, (err, db) => {
+        if (err) {
+            db.close();
+            client.emit("getUser", "failure");
+            return;
+        }
+        const dbo = db.db(dbName);
+        dbo.collection("users").findOne({ _id: user }, (err, result) => {
+            if (err) {
+                db.close();
+                client.emit("getUser", "failure");
+                return;
+            }
+            db.close();
+            client.emit("getUser", result);
+        });
     });
-  });
 }

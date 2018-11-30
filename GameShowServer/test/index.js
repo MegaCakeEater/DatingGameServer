@@ -7,28 +7,28 @@ var userMap = new Map();
 const socket = io('http://localhost:3000');
 
 socket.on("match", (response, gameId) => {
-  console.log("match " + response);
-  console.log("match2 " + gameId);
+    console.log("match " + response);
+    console.log("match2 " + gameId);
 
-  tokens.forEach((token) => {
-    socket.emit("confirmParticipation", token, gameId, true);
-  });
+    tokens.forEach((token) => {
+        socket.emit("confirmParticipation", token, gameId, true);
+    });
 });
 socket.on("startGame", response => {
-  console.log("startGame " + response);
+    console.log("startGame " + response);
 });
 
 socket.on("login", (response) => {
-  if(tokens.push(response) == 6) {
-    tokens.forEach((token) => {
-      socket.emit("match", token, true);
-    });
-    socket.emit("match", tokens[1], false);
-  }
+    if (tokens.push(response) == 6) {
+        tokens.forEach((token) => {
+            socket.emit("match", token, true);
+        });
+        socket.emit("match", tokens[1], false);
+    }
 });
 
 socket.on("inQueue", (response) => {
-  console.log("inQueue " + response);
+    console.log("inQueue " + response);
 })
 
 socket.emit("createUser", "hest", "1234", "yes", 18);
