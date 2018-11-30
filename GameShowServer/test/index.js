@@ -6,7 +6,7 @@ var tokens = [];
 var userMap = new Map();
 const socket = io('http://localhost:3000');
 
-socket.on("match", (response, gameId) => {
+/* socket.on("match", (response, gameId) => {
     console.log("match " + response);
     console.log("match2 " + gameId);
 
@@ -44,13 +44,18 @@ socket.emit("login", "hest3", "1234");
 socket.emit("login", "hest4", "1234");
 socket.emit("login", "hest5", "1234");
 socket.emit("login", "hest6", "1234");
-
-/* socket.on("createUser", (response) => {
+ */
+socket.on("createUser", (response) => {
   console.log("createUser " + response);
+});
+socket.on("getUser", response => {
+console.log(response);
 });
 socket.on("login", (token) => {
   console.log("login " + token);
   myToken = token;
+  socket.emit("updateBiography",token,"hest23");
+  socket.emit("getUser",token, "hest23");
   socket.emit("match", myToken);
   socket.emit("uploadFile", myToken, 1, "aaa");
 
@@ -58,14 +63,14 @@ socket.on("login", (token) => {
 
   socket.emit("uploadFile", myToken, 3, "ccc");
 
-  fs.readdir('testFiles',(err, files) => {
+  /* fs.readdir('testFiles',(err, files) => {
     files.forEach(element => {
       fs.readFile(element, (err, data) => {
         if(err) throw err
         socket.emit('uploadFile', myToken, 1, data);
       });
     });
- });
+ }); */
 });
 socket.on("match", (response) => {
   console.log("match " + response);
@@ -85,7 +90,7 @@ socket.on("getVideo", (response) => {
   console.log("getVideo " + new Buffer(response, 'base64'));
   fs.writeFile('testFiles2/README.md', new Buffer(response, 'base64'), null, (err) =>{});
 });
-socket.emit("createUser", "hest", "1234", "yes", 18);
+socket.emit("createUser", "hest23", "1234", "yes", 18);
 socket.emit("createUser", "hest2", "1234", "yes", 19);
 socket.emit("createUser", "hest3", "1234", "yes", 20);
-socket.emit("login", "hest", "1234"); */
+socket.emit("login", "hest23", "1234");

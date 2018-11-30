@@ -376,9 +376,10 @@ function updateBiography(token, bio, client) {
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("users").updateOne({ username: username }, { $set: { biography: bio } },
+        dbo.collection("users").updateOne({ _id: username }, { $set: { biography: bio } },
             (err, result) => {
                 if (err) {
+                    console.log(err);
                     db.close();
                     client.emit("updateBiography", "failure");
                     return;
@@ -399,7 +400,7 @@ function updateProfilePicture(token, pic, client) {
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("users").updateOne({ username: username }, { $set: { profilePicture: pic } },
+        dbo.collection("users").updateOne({ _id: username }, { $set: { profilePicture: pic } },
             (err, result) => {
                 if (err) {
                     db.close();
