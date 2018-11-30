@@ -13,8 +13,6 @@ const activeGames = new Map();
 const unconfirmedGames = new Map();
 const totalRounds = 3;
 
-
-
 io.on('connection', client => {
     client.on('event', data => { //do nothing
     });
@@ -202,16 +200,51 @@ function vote(token, gameId, timeStamp, client) { //TODO: database til timestamp
     game.judgers = game.judgers.filter((judger) => {
         judger.username != username;
     });
-    client.emit("gameUpdate", game.judgers.length, judgersNeededToPlay, game.round);
+    if (game.judgers.length == 0) {
+        game.nonJudgers.forEach(nonJudger => {
+            nonJudger.client.emit("gameOver");
+        });
+    } else {
+        game.judgers.forEach(judger => {
+            judger.client.emit("gameUpdate", game.judgers.length, judgersNeededToPlay, game.round);
+        });
+        game.nonJudgers.forEach(nonJudger => {
+            nonJudger.client.emit("gameUpdate", game.judgers.length, judgersNeededToPlay, game.round);
+        });
+    }
 }
 
 function comments(token, gameId, comment, client) { //TODO: gem de her comments
     console.log("comment " + comment);
+    mongoClient.connect(url, (err, db) => {
+        if (err) {
+            db.close();
+            client.emit("comment", "failure");
+            return;
+        }
+
+        const dbo = db.db(dbName);
+
+        game.nonJudgers.forEach(nonJudger => {
+            dbo.collection("comments").insertOne({ _id: nonJudger.username, comment: comment }, (err, result) => {
+                if (err) {
+                    db.close();
+                    client.emit("comment", "failure");
+                    return;
+                }
+            });
+        });
+        db.close();
+        client.emit("comment", "success");
+    });
+
+
 }
 
 function videoOver(token, gameId, client) {
     if (!checkToken(token, client)) return;
     username = tokenMap.get(token);
+    game = activeGames.get(gameId);
     game.judgers.forEach((judger) => {
         if (judger.username = username) judger.hasWatched = true;
     });
@@ -246,7 +279,9 @@ function handleGameOver(game) {
         judger.client.emit("gameOver");
     });
     game.nonJudgers.forEach(nonJudger => {
-        nonJudger.client.emit("gameOver");
+        game.judgers.forEach(judger => {
+            nonJudger.client.emit("gameOver", judger.username);
+        });
     });
 }
 
