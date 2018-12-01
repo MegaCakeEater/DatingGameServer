@@ -5,8 +5,9 @@ const dbName = "GameShowDatingAppDB";
 const mongoClient = require('mongodb').MongoClient;
 const url = "mongodb://localhost:27017/";
 const tokenMap = new Map();
+const clientMap = new Map();
 var judgerQueue = [];
-var nonJudgerQueue = []; //TODO: hvad fuck kalder vi lige deltagerne?
+var nonJudgerQueue = [];
 const judgersNeededToPlay = 5;
 const nonJudgersNeededToPlay = 1;
 const activeGames = new Map();
@@ -30,7 +31,6 @@ io.on('connection', client => {
     client.on("getUser", (token, username) => {
         getUser(token, username, client);
     });
-
     client.on("login", (username, password) => {
         login(username, password, client);
     });
@@ -54,6 +54,12 @@ io.on('connection', client => {
     });
     client.on("videoOver", (token, gameId) => {
         videoOver(token, gameId, client);
+    });
+    client.on("getMessages", (token) => {
+        getMessages(token, client);
+    });
+    client.on("sendMessage", (token, receiver, message, timestamp) => {
+        sendMessage(token, receiver, message, timestamp, client);
     });
 });
 server.listen(port);
@@ -293,6 +299,7 @@ function generateUUID() {
 }
 
 function login(username, password, client) {
+    console.log(username + " logged in");
     mongoClient.connect(url, (err, db) => {
         if (err) {
             client.emit("login", "failure");
@@ -308,6 +315,7 @@ function login(username, password, client) {
             }
             else if (result != null) {
                 let token = generateUUID();
+                clientMap.set(username, client);
                 tokenMap.set(token, username);
                 client.emit("login", token);
             } else {
@@ -430,6 +438,52 @@ function getUser(token, user, client) {
             }
             db.close();
             client.emit("getUser", result);
+        });
+    });
+}
+
+function getMessages(token, client) {
+    if (!checkToken(token, client)) return;
+    username = tokenMap.get(token);
+    mongoClient.connect(url, (err, db) => {
+        if (err) {
+            db.close();
+            client.emit("getMessages", "failure");
+            return;
+        }
+        const dbo = db.db(dbName);
+        dbo.collection("messages").find({ $or: [{ sender: username }, { receiver: username }] }, (err, result) => {
+            if (err) {
+                db.close();
+                client.emit("getMessages", "failure");
+                return;
+            }
+            result.toArray().then(messages => client.emit("getMessages", messages));
+        });
+    });
+}
+
+function sendMessage(token, reciever, message, timestamp, client) {
+    if (!checkToken(token, client)) return;
+    var sender = tokenMap.get(token);
+    var messageToSend = { sender: sender, reciever: reciever, message: message, timestamp: timestamp };
+    mongoClient.connect(url, (err, db) => {
+        if (err) {
+            db.close();
+            client.emit("sendMessage", "failure");
+            return;
+        }
+        const dbo = db.db(dbName);
+        dbo.collection("messages").insertOne(messageToSend, (err, result) => {
+            if (err) {
+                db.close();
+                client.emit("sendMessage", "failure");
+                return;
+            }
+            db.close();
+            if (clientMap.has(reciever) && clientMap.get(reciever).connected) {
+                clientMap.get(reciever).emit("messageRecieved", messageToSend);
+            }
         });
     });
 }
