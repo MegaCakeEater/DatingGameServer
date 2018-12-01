@@ -84,7 +84,7 @@ function getVideo(token, username, roundNumber, client) {
         const dbo = db.db(dbName);
         let round = "round" + roundNumber;
 
-        dbo.collection("videos").findOne({ _id: username }, { fields: { _id: 0, [round]: 1 } }, (err, result) => {
+        dbo.collection("videos").findOne({_id: username}, {fields: {_id: 0, [round]: 1}}, (err, result) => {
             if (err) {
                 db.close();
                 client.emit("getVideo", "failure");
@@ -98,7 +98,7 @@ function getVideo(token, username, roundNumber, client) {
 
 function match(token, judger, client) {
     if (!checkToken(token, client)) return;
-    player = { client: client, username: tokenMap.get(token), confirmed: false, hasWatched: false };
+    player = {client: client, username: tokenMap.get(token), confirmed: false, hasWatched: false};
     //TODO: DET BURDE VIRKE SÅDAN HER, MEN MAN KAN IKKE TESTE MED KUN EN KLIENT SÅ
     /* if (judger) {
       if (!judgerQueue.includes(client)) judgerQueue.push(player);
@@ -135,7 +135,7 @@ function requestGame() {
         nonJudger.client.emit("match", gameId);
     });
 
-    let game = { judgers: judgers, nonJudgers: nonJudgers, round: 1 };
+    let game = {judgers: judgers, nonJudgers: nonJudgers, round: 1};
     unconfirmedGames.set(gameId, game);
 }
 
@@ -231,7 +231,7 @@ function comments(token, gameId, comment, client) { //TODO: gem de her comments
         const dbo = db.db(dbName);
 
         game.nonJudgers.forEach(nonJudger => {
-            dbo.collection("comments").insertOne({ _id: nonJudger.username, comment: comment }, (err, result) => {
+            dbo.collection("comments").insertOne({_id: nonJudger.username, comment: comment}, (err, result) => {
                 if (err) {
                     db.close();
                     client.emit("comment", "failure");
@@ -307,7 +307,7 @@ function login(username, password, client) {
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("users").findOne({ _id: username, password: password }, (err, result) => {
+        dbo.collection("users").findOne({_id: username, password: password}, (err, result) => {
             if (err) {
                 client.emit("login", "failure");
                 db.close();
@@ -347,7 +347,7 @@ function handleVideoUpload(token, roundNumber, data, client) {
         }
         const dbo = db.db(dbName);
         let round = "round" + roundNumber;
-        dbo.collection("videos").updateOne({ _id: username }, { $set: { [round]: data } }, { upsert: true });
+        dbo.collection("videos").updateOne({_id: username}, {$set: {[round]: data}}, {upsert: true});
         db.close();
         client.emit("uploadFile", "success");
     });
@@ -361,7 +361,14 @@ function createUser(username, password, sex, age, client) {
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("users").insertOne({ _id: username, password: password, sex: sex, age: age, biography: null, profilePicture: null },
+        dbo.collection("users").insertOne({
+                _id: username,
+                password: password,
+                sex: sex,
+                age: age,
+                biography: null,
+                profilePicture: null
+            },
             (err, result) => {
                 if (err) {
                     client.emit("createUser", "failure");
@@ -384,7 +391,7 @@ function updateBiography(token, bio, client) {
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("users").updateOne({ _id: username }, { $set: { biography: bio } },
+        dbo.collection("users").updateOne({_id: username}, {$set: {biography: bio}},
             (err, result) => {
                 if (err) {
                     console.log(err);
@@ -408,7 +415,7 @@ function updateProfilePicture(token, pic, client) {
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("users").updateOne({ _id: username }, { $set: { profilePicture: pic } },
+        dbo.collection("users").updateOne({_id: username}, {$set: {profilePicture: pic}},
             (err, result) => {
                 if (err) {
                     db.close();
@@ -430,7 +437,7 @@ function getUser(token, user, client) {
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("users").findOne({ _id: user }, (err, result) => {
+        dbo.collection("users").findOne({_id: user}, (err, result) => {
             if (err) {
                 db.close();
                 client.emit("getUser", "failure");
@@ -452,7 +459,7 @@ function getMessages(token, client) {
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("messages").find({ $or: [{ sender: username }, { receiver: username }] }, (err, result) => {
+        dbo.collection("messages").find({$or: [{sender: username}, {reciever: username}]}, (err, result) => {
             if (err) {
                 db.close();
                 client.emit("getMessages", "failure");
@@ -466,7 +473,7 @@ function getMessages(token, client) {
 function sendMessage(token, reciever, message, timestamp, client) {
     if (!checkToken(token, client)) return;
     var sender = tokenMap.get(token);
-    var messageToSend = { sender: sender, reciever: reciever, message: message, timestamp: timestamp };
+    var messageToSend = {sender: sender, reciever: reciever, message: message, timestamp: timestamp};
     mongoClient.connect(url, (err, db) => {
         if (err) {
             db.close();
@@ -481,6 +488,7 @@ function sendMessage(token, reciever, message, timestamp, client) {
                 return;
             }
             db.close();
+            client.emit("sendMessage", "success");
             if (clientMap.has(reciever) && clientMap.get(reciever).connected) {
                 clientMap.get(reciever).emit("messageRecieved", messageToSend);
             }
