@@ -73,29 +73,6 @@ mongoClient.connect(url, (err, db) => {
 });
 
 
-function getVideo(token, username, roundNumber, client) {
-    if (!checkToken(token, client)) return;
-    mongoClient.connect(url, (err, db) => {
-        if (err) {
-            db.close();
-            client.emit("getVideo", "failure");
-            return;
-        }
-        const dbo = db.db(dbName);
-        let round = "round" + roundNumber;
-
-        dbo.collection("videos").findOne({_id: username}, {fields: {_id: 0, [round]: 1}}, (err, result) => {
-            if (err) {
-                db.close();
-                client.emit("getVideo", "failure");
-                return;
-            }
-            db.close();
-            client.emit("getVideo", result[round]);
-        });
-    });
-}
-
 function match(token, judger, client) {
     if (!checkToken(token, client)) return;
     player = {client: client, username: tokenMap.get(token), confirmed: false, hasWatched: false};
@@ -280,7 +257,7 @@ function handleGameOver(game) {
         judger.client.emit("gameOver");
     });
     game.nonJudgers.forEach(nonJudger => {
-        nonJudger.emit("gameOver",game.judgers.map(judger=> judger.username));
+        nonJudger.emit("gameOver", game.judgers.map(judger => judger.username));
         /*    game.judgers.forEach(judger => {
                 nonJudger.client.emit("gameOver", judger.username);
             });*/
@@ -344,9 +321,38 @@ function handleVideoUpload(token, roundNumber, data, client) {
         }
         const dbo = db.db(dbName);
         let round = "round" + roundNumber;
+        console.log("data");
+        console.log(data);
         dbo.collection("videos").updateOne({_id: username}, {$set: {[round]: data}}, {upsert: true});
         db.close();
         client.emit("uploadFile", "success");
+    });
+}
+
+function getVideo(token, username, roundNumber, client) {
+    if (!checkToken(token, client)) return;
+    mongoClient.connect(url, (err, db) => {
+        if (err) {
+            db.close();
+            client.emit("getVideo", "failure");
+            return;
+        }
+        const dbo = db.db(dbName);
+        let round = "round" + roundNumber;
+        dbo.collection("videos").findOne({_id: username}, (err, result) => {
+            if (err || result == null) {
+                db.close();
+                client.emit("getVideo", "failure");
+                console.log("video failure");
+                return;
+            }
+            if (result[round] != null) {
+                client.emit("getVideo", result[round].buffer);
+            } else {
+                client.emit("getVideo", "failure");
+            }
+            db.close();
+        });
     });
 }
 
@@ -435,12 +441,17 @@ function getUser(token, user, client) {
         }
         const dbo = db.db(dbName);
         dbo.collection("users").findOne({_id: user}, (err, result) => {
-            if (err) {
+            if (err || result == null) {
                 db.close();
                 client.emit("getUser", "failure");
                 return;
             }
             db.close();
+            console.log(result);
+
+            if (result.profilePicture != null && result.profilePicture.buffer != null) result.profilePicture = result.profilePicture.buffer;
+
+            console.log(result);
             client.emit("getUser", result);
         });
     });
