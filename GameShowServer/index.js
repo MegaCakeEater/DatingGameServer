@@ -192,7 +192,7 @@ function checkGameCanStart(game) {
     nonJudgersReady = game.nonJudgers.filter((nonJudger) => {
         return nonJudger.confirmed;
     }).length;
-    return judgersReady == judgersNeededToPlay && nonJudgersReady == nonJudgersNeededToPlay;
+    return judgersReady === judgersNeededToPlay && nonJudgersReady === nonJudgersNeededToPlay;
 }
 
 function vote(token, gameId, timeStamp, client) { //TODO: database til timestamp
@@ -202,10 +202,8 @@ function vote(token, gameId, timeStamp, client) { //TODO: database til timestamp
     if (game == null) {
         return;
     }
-    game.judgers = game.judgers.filter((judger) => {
-        judger.username != username;
-    });
-    if (game.judgers.length == 0) {
+    game.judgers = game.judgers.filter((judger) => judger.username !== username);
+    if (game.judgers.length === 0) {
         game.nonJudgers.forEach(nonJudger => {
             nonJudger.client.emit("gameOver");
         });
@@ -260,9 +258,7 @@ function videoOver(token, gameId, client) {
 }
 
 function canGoToNextRound(game) {
-    return game.judgers.every(judge => {
-        judge.hasWatched
-    });
+    return game.judgers.every(judge => judge.hasWatched);
 }
 
 function startNextRound(game) {
@@ -284,9 +280,10 @@ function handleGameOver(game) {
         judger.client.emit("gameOver");
     });
     game.nonJudgers.forEach(nonJudger => {
-        game.judgers.forEach(judger => {
-            nonJudger.client.emit("gameOver", judger.username);
-        });
+        nonJudger.emit("gameOver",game.judgers.map(judger=> judger.username));
+        /*    game.judgers.forEach(judger => {
+                nonJudger.client.emit("gameOver", judger.username);
+            });*/
     });
 }
 
