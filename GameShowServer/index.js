@@ -1,8 +1,15 @@
-
-"use strict";
+'use strict';
 const server = require('http').createServer();
-const io = require('socket.io')(server);
-const port = 3000;
+const io = require('socket.io')({
+    path: '',
+    serveClient: false,
+});
+io.attach(server, {
+    pingInterval: 10000,
+    pingTimeout: 5000,
+    cookie: false
+});
+const port = 3001;
 const dbName = "GameShowDatingAppDB";
 const mongoClient = require('mongodb').MongoClient;
 const url = "mongodb://localhost:27017/";
@@ -15,6 +22,9 @@ const nonJudgersNeededToPlay = 1;
 const activeGames = new Map();
 const unconfirmedGames = new Map();
 const totalRounds = 3;
+const picDir = 'files/pictures';
+const videoDir = 'files/videos';
+var fs = require('fs');
 
 io.on('connection', client => {
     client.on('event', data => { //do nothing
@@ -24,7 +34,7 @@ io.on('connection', client => {
         console.log("disconnect");
     });
     client.on("uploadFile", (token, roundnumber, data) => {
-        console.log("uploadFile " + token + " " + roundnumber + " " + data);
+        console.log("uploadFile " + token + " " + roundnumber);
         handleVideoUpload(token, roundnumber, data, client)
     });
     client.on("getVideo", (token, username, roundNumber) => {
@@ -56,7 +66,7 @@ io.on('connection', client => {
         updateBiography(token, bio, client);
     });
     client.on("updateProfilePicture", (token, pic) => {
-        console.log("updateProfilePicture " + token + " " + pic);
+        console.log("updateProfilePicture " + token);
         updateProfilePicture(token, pic, client);
     });
     client.on("vote", (token, gameId, timeStamp) => {
@@ -86,7 +96,7 @@ io.on('connection', client => {
         console.log("connecting " + conn);
     });
     client.on('connect_failed', err => {
-        console.log("connect failed " +err);
+        console.log("connect failed " + err);
     });
     client.on('message', message => {
         console.log("message " + messsage);
@@ -137,8 +147,8 @@ function match(token, judger, client) {
     if (canPlay()) {
         requestGame();
     }
-    judgerQueue.forEach(dude => { console.log("judger => " + dude.username)});
-    nonJudgerQueue.forEach(dude => { console.log("nonJudger => " + dude.username)});
+    judgerQueue.forEach(dude => { console.log("judger => " + dude.username) });
+    nonJudgerQueue.forEach(dude => { console.log("nonJudger => " + dude.username) });
 }
 
 function canPlay() {
@@ -208,10 +218,10 @@ function startGame(game, gameId) {
 }
 
 function checkGameCanStart(game) {
-    judgersReady = game.judgers.filter((judger) => {
+    var judgersReady = game.judgers.filter((judger) => {
         return judger.confirmed;
     }).length;
-    nonJudgersReady = game.nonJudgers.filter((nonJudger) => {
+    var nonJudgersReady = game.nonJudgers.filter((nonJudger) => {
         return nonJudger.confirmed;
     }).length;
     return judgersReady === judgersNeededToPlay && nonJudgersReady === nonJudgersNeededToPlay;
@@ -270,8 +280,8 @@ function comments(token, gameId, comment, client) { //TODO: gem de her comments
 
 function videoOver(token, gameId, client) {
     if (!checkToken(token, client)) return;
-    username = tokenMap.get(token);
-    game = activeGames.get(gameId);
+    var username = tokenMap.get(token);
+    var game = activeGames.get(gameId);
     game.judgers.forEach((judger) => {
         if (judger.username = username) judger.hasWatched = true;
     });
@@ -320,7 +330,6 @@ function generateUUID() {
 }
 
 function login(username, password, client) {
-    console.log(username + " logged in");
     mongoClient.connect(url, (err, db) => {
         if (err) {
             console.log(err);
@@ -337,14 +346,14 @@ function login(username, password, client) {
                 return;
             }
             else if (result != null) {
-                tokenMap.forEach((value, key, a)=> {
-                    if(value == username) {
+                tokenMap.forEach((value, key, a) => {
+                    if (value == username) {
                         tokenMap.delete(key);
                     }
                 });
                 let token = generateUUID();
                 var client2 = clientMap.get(username);
-                if(client2 != null) {
+                if (client2 != null) {
                     client2.disconnect();
                 }
                 clientMap.set(username, client);
@@ -381,7 +390,8 @@ function handleVideoUpload(token, roundNumber, data, client) {
         }
         const dbo = db.db(dbName);
         let round = "round" + roundNumber;
-        dbo.collection("videos").updateOne({ _id: username }, { $set: { [round]: data } }, { upsert: true });
+        writeFile(videoDir, username + round, data);
+        dbo.collection("videos").updateOne({ _id: username }, { $set: { [round]: username + round } }, { upsert: true });
         db.close();
         client.emit("uploadFile", "success");
     });
@@ -406,12 +416,27 @@ function getVideo(token, username, roundNumber, client) {
                 return;
             }
             if (result[round] != null) {
-                client.emit("getVideo", result[round].buffer);
+                getFile(videoDir, result[round], (data => {
+                    client.emit("getVideo", data.buffer);
+                }));
             } else {
                 client.emit("getVideo", "failure");
             }
             db.close();
         });
+    });
+}
+
+function getFile(dir, filename, callback) {
+    fs.readFile(dir + '/' + filename, (err, data) => {
+        callback(data);
+    });
+}
+
+function writeFile(dir, filename, content) {
+
+    fs.writeFileSync(require('path').resolve(dir + '/', filename), Buffer.alloc(1024, content, 'base64'), null, (err) => {
+        console.log(err);
     });
 }
 
@@ -481,7 +506,8 @@ function updateProfilePicture(token, pic, client) {
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("users").updateOne({ _id: username }, { $set: { profilePicture: pic } },
+        writeFile(picDir, username, pic);
+        dbo.collection("users").updateOne({ _id: username }, { $set: { profilePicture: username } },
             (err, result) => {
                 if (err) {
                     console.log(err);
@@ -512,11 +538,12 @@ function getUser(token, user, client) {
                 client.emit("getUser", "failure");
                 return;
             }
-            db.close();
 
-            if (result.profilePicture != null && result.profilePicture.buffer != null) result.profilePicture = result.profilePicture.buffer;
-
-            client.emit("getUser", result);
+            getFile(picDir, result.profilePicture, data => {
+                result.profilePicture = data;
+                client.emit("getUser", result);
+                db.close();
+            });
         });
     });
 }
