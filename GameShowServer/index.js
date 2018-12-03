@@ -3,12 +3,12 @@ const server = require('http').createServer();
 const io = require('socket.io')({
     path: '',
     serveClient: false,
-});
+  });
 io.attach(server, {
     pingInterval: 10000,
     pingTimeout: 5000,
     cookie: false
-});
+  });
 const port = 3001;
 const dbName = "GameShowDatingAppDB";
 const mongoClient = require('mongodb').MongoClient;
@@ -96,7 +96,7 @@ io.on('connection', client => {
         console.log("connecting " + conn);
     });
     client.on('connect_failed', err => {
-        console.log("connect failed " + err);
+        console.log("connect failed " +err);
     });
     client.on('message', message => {
         console.log("message " + messsage);
@@ -147,8 +147,8 @@ function match(token, judger, client) {
     if (canPlay()) {
         requestGame();
     }
-    judgerQueue.forEach(dude => { console.log("judger => " + dude.username) });
-    nonJudgerQueue.forEach(dude => { console.log("nonJudger => " + dude.username) });
+    judgerQueue.forEach(dude => { console.log("judger => " + dude.username)});
+    nonJudgerQueue.forEach(dude => { console.log("nonJudger => " + dude.username)});
 }
 
 function canPlay() {
@@ -346,14 +346,14 @@ function login(username, password, client) {
                 return;
             }
             else if (result != null) {
-                tokenMap.forEach((value, key, a) => {
-                    if (value == username) {
+                tokenMap.forEach((value, key, a)=> {
+                    if(value == username) {
                         tokenMap.delete(key);
                     }
                 });
                 let token = generateUUID();
                 var client2 = clientMap.get(username);
-                if (client2 != null) {
+                if(client2 != null) {
                     client2.disconnect();
                 }
                 clientMap.set(username, client);
@@ -416,7 +416,7 @@ function getVideo(token, username, roundNumber, client) {
                 return;
             }
             if (result[round] != null) {
-                getFile(videoDir, result[round], (data => {
+                getFile(videoDir,result[round], (data => {
                     client.emit("getVideo", data.buffer);
                 }));
             } else {
@@ -428,14 +428,14 @@ function getVideo(token, username, roundNumber, client) {
 }
 
 function getFile(dir, filename, callback) {
-    fs.readFile(dir + '/' + filename, (err, data) => {
+    fs.readFile(dir +'/' +filename,(err, data) => {
         callback(data);
     });
 }
 
 function writeFile(dir, filename, content) {
-
-    fs.writeFileSync(require('path').resolve(dir + '/', filename), Buffer.alloc(1024, content, 'base64'), null, (err) => {
+    
+    fs.writeFileSync(require('path').resolve(dir +'/',filename), new Buffer(content, 'base64'), null, (err) => {
         console.log(err);
     });
 }
