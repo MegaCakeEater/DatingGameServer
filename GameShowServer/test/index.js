@@ -1,10 +1,10 @@
 const io = require('socket.io-client')
 const host = 'localhost';
-const port = 3000;
+const port = 3001;
 var fs = require('fs');
 var tokens = [];
 var userMap = new Map();
-const socket = io('http://localhost:3000');
+const socket = io('http://localhost:3001');
 
 /* socket.on("match", (response, gameId) => {
     console.log("match " + response);
@@ -63,8 +63,9 @@ socket.on("sendMessage", (response) => {
 });
 
 socket.on("getVideo", (response) => {
-    console.log("getVideo " + new Buffer(response, 'base64'));
-    fs.writeFile('testFiles2/README.md', new Buffer(response, 'base64'), null, (err) => { });
+    console.log("getVideo ");
+    console.log(response);
+    fs.writeFile('testFiles2/hest.mp4', new Buffer(response, 'base64'), null, (err) => { });
 });
 
 socket.on("createUser", (response) => {
@@ -76,10 +77,7 @@ socket.on("getUser", response => {
 socket.on("login", (token) => {
     myToken = token;
     tokens.push(token);
-    if (tokens.length == 6) {
-       // socket.emit("sendMessage", myToken, "hest6", "suuup?", 1543660068606);
-        socket.emit("getMessages", token);
-    }
+        socket.emit("getVideo", token, "a", 1);
     /* socket.emit("updateBiography",token,"hest23");
     socket.emit("getUser",token, "hest23");
     socket.emit("match", myToken); */
@@ -98,10 +96,5 @@ socket.on("login", (token) => {
       });
    }); */
 });
-
+//socket.emit("createUser", "hest", "1234", "yes", 18);
 socket.emit("login", "hest", "1234");
-socket.emit("login", "hest2", "1234");
-socket.emit("login", "hest3", "1234");
-socket.emit("login", "hest4", "1234");
-socket.emit("login", "hest5", "1234");
-socket.emit("login", "hest6", "1234");

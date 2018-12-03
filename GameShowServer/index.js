@@ -211,7 +211,7 @@ function startGame(game, gameId) {
         });
     });
     game.nonJudgers.forEach(nonJudger => {
-        nonJudger.client.emit("startGame", gameId, game.judgers.length);
+        nonJudger.client.emit("startGame", gameId, game.judgers.length, nonJudger.username);
     });
 }
 
@@ -387,9 +387,8 @@ function handleVideoUpload(token, roundNumber, data, client) {
             return;
         }
         const dbo = db.db(dbName);
-        let round = "round" + roundNumber;
-        writeFile(videoDir, username + round, data);
-        dbo.collection("videos").updateOne({ _id: username }, { $set: { [round]: username + round } }, { upsert: true });
+        writeFile(videoDir, username + roundNumber, data);
+        dbo.collection("videos").updateOne({ username: username, roundNumber: roundNumber }, { $set: { video : username + roundNumber } }, { upsert: true });
         db.close();
         client.emit("uploadFile", "success");
     });
@@ -405,17 +404,16 @@ function getVideo(token, username, roundNumber, client) {
             return;
         }
         const dbo = db.db(dbName);
-        let round = "round" + roundNumber;
-        dbo.collection("videos").findOne({ _id: username }, (err, result) => {
+        dbo.collection("videos").findOne({ username: username, roundNumber: roundNumber}, (err, result) => {
             if (err || result == null) {
                 if (err) console.log(err);
                 db.close();
                 client.emit("getVideo", "failure");
                 return;
             }
-            if (result[round] != null) {
-                getFile(videoDir,result[round], (data => {
-                    client.emit("getVideo", data.buffer);
+            if (result.video != null) {
+                getFile(videoDir, result.video, (data => {
+                    client.emit("getVideo", {video:data.buffer});
                 }));
             } else {
                 client.emit("getVideo", "failure");
@@ -426,6 +424,7 @@ function getVideo(token, username, roundNumber, client) {
 }
 
 function getFile(dir, filename, callback) {
+    console.log(dir +'/' +filename);
     fs.readFile(dir +'/' +filename,(err, data) => {
         callback(data);
     });
