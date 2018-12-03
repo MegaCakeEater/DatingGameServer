@@ -73,10 +73,15 @@ io.on('connection', client => {
         console.log("vote " + token + " " + gameId + " " + timeStamp);
         vote(token, gameId, timeStamp, client);
     });
-    client.on("comment", (token, gameId, comment) => {
+    client.on("comment", (token, gameId, comment,timeStamp) => {
         console.log("comment " + token + " " + gameId + " " + comment);
-        comments(token, gameId, comment, client);
+            comments(token, gameId, comment, timeStamp, client);
     });
+    client.on("getComment", (token, username) => {
+        console.log("getComment " + token + " " + username);
+        getComments(token, gameId, comment, timeStamp, client);
+    });
+
     client.on("videoOver", (token, gameId) => {
         console.log("videoOver " + token + " " + gameId);
         videoOver(token, gameId, client);
@@ -99,7 +104,7 @@ io.on('connection', client => {
         console.log("connect failed " +err);
     });
     client.on('message', message => {
-        console.log("message " + messsage);
+        console.log("message " + message);
     });
     client.on('reconnect', recon => {
         console.log("reconnect " + recon);
@@ -247,7 +252,30 @@ function vote(token, gameId, timeStamp, client) { //TODO: database til timestamp
     }
 }
 
-function comments(token, gameId, comment, client) { //TODO: gem de her comments
+function getComments(token, user, client) {
+    if (!checkToken(token, client)) return;
+    mongoClient.connect(url, (err, db) => {
+        if (err) {
+            console.log(err);
+            db.close();
+            client.emit("getComments", "failure");
+            return;
+        }
+        const dbo = db.db(dbName);
+        dbo.collection("comments").find({ to: user } , (err, result) => {
+            if (err || result == null) {
+                console.log(err);
+                db.close();
+                client.emit("getComments", "failure");
+                return;
+            }
+            db.close();
+            result.toArray().then(messages => client.emit("getComments", messages));
+        });
+    });
+}
+
+function comments(token, gameId, comment, timeStamp, client) { //TODO: gem de her comments
     console.log("comment " + comment);
     mongoClient.connect(url, (err, db) => {
         if (err) {
@@ -259,8 +287,17 @@ function comments(token, gameId, comment, client) { //TODO: gem de her comments
 
         const dbo = db.db(dbName);
 
+        const game = activeGames.get(gameId);
+        const commentObj = {
+            text: comment,
+            timestamp: timeStamp,
+            from: clientMap.get(client),
+            to: game.username,
+            video: game.round
+        };
+
         game.nonJudgers.forEach(nonJudger => {
-            dbo.collection("comments").insertOne({ _id: nonJudger.username, comment: comment }, (err, result) => {
+            dbo.collection("comments").insertOne({username: nonJudger.username, comment: commentObj}, (err, result) => {
                 if (err) {
                     console.log(err);
                     db.close();
