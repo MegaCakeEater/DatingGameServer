@@ -17,7 +17,7 @@ const tokenMap = new Map();
 const clientMap = new Map();
 var judgerQueue = [];
 var nonJudgerQueue = [];
-const judgersNeededToPlay = 5;
+const judgersNeededToPlay = 2;
 const nonJudgersNeededToPlay = 1;
 const activeGames = new Map();
 const unconfirmedGames = new Map();
@@ -59,7 +59,7 @@ io.on('connection', client => {
     });
     client.on("confirmParticipation", (token, gameId, response) => {
         console.log("confirmPartcipation " + token + " " + gameId + " " + response);
-        confirmParticipation(token, gameId, response);
+        confirmParticipation(token, gameId, response, client);
     });
     client.on("updateBiography", (token, bio) => {
         console.log("updateBiography " + token + " " + bio);
@@ -132,10 +132,10 @@ function match(token, judger, client) {
     if (!checkToken(token, client)) return;
     var player = { client: client, username: tokenMap.get(token), confirmed: false, hasWatched: false };
     judgerQueue = judgerQueue.filter(queuedPlayer => {
-        queuedPlayer.username != player.username
+        return queuedPlayer.username != player.username;
     });
     nonJudgerQueue = nonJudgerQueue.filter(queuedPlayer => {
-        queuedPlayer.username != player.username
+        return queuedPlayer.username != player.username;
     });
     if (judger) {
         judgerQueue.push(player);
@@ -147,8 +147,6 @@ function match(token, judger, client) {
     if (canPlay()) {
         requestGame();
     }
-    judgerQueue.forEach(dude => { console.log("judger => " + dude.username)});
-    nonJudgerQueue.forEach(dude => { console.log("nonJudger => " + dude.username)});
 }
 
 function canPlay() {
@@ -171,7 +169,7 @@ function requestGame() {
     unconfirmedGames.set(gameId, game);
 }
 
-function confirmParticipation(token, gameId, reponse) {
+function confirmParticipation(token, gameId, reponse, client) {
     if (!checkToken(token, client)) return;
     const username = tokenMap.get(token);
     const game = unconfirmedGames.get(gameId);
@@ -209,11 +207,11 @@ function startGame(game, gameId) {
     console.log(gameId + " starting");
     game.judgers.forEach(judger => {
         game.nonJudgers.forEach(nonJudger => {
-            judger.client.emit("startGame", gameId, judgers.length, nonJudger.username);
+            judger.client.emit("startGame", gameId, game.judgers.length, nonJudger.username);
         });
     });
     game.nonJudgers.forEach(nonJudger => {
-        nonJudger.client.emit("startGame", gameId, judgers.length);
+        nonJudger.client.emit("startGame", gameId, game.judgers.length);
     });
 }
 
