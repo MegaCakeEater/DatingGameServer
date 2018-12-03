@@ -1,3 +1,5 @@
+
+"use strict";
 const server = require('http').createServer();
 const io = require('socket.io')(server);
 const port = 3000;
@@ -16,74 +18,115 @@ const totalRounds = 3;
 
 io.on('connection', client => {
     client.on('event', data => { //do nothing
+        console.log("event " + data);
     });
     client.on('disconnect', () => { //do nothing
+        console.log("disconnect");
     });
     client.on("uploadFile", (token, roundnumber, data) => {
+        console.log("uploadFile " + token + " " + roundnumber + " " + data);
         handleVideoUpload(token, roundnumber, data, client)
     });
     client.on("getVideo", (token, username, roundNumber) => {
+        console.log("getVideo " + token + " " + username + " " + roundNumber);
         getVideo(token, username, roundNumber, client);
     });
     client.on("createUser", (username, password, sex, age) => {
+        console.log("createUser " + username + " " + password + " " + sex + " " + age);
         createUser(username, password, sex, age, client);
     });
     client.on("getUser", (token, username) => {
+        console.log("getUser " + token + " " + username);
         getUser(token, username, client);
     });
     client.on("login", (username, password) => {
+        console.log("login " + username + " " + password);
         login(username, password, client);
     });
     client.on("match", (token, judger) => {
+        console.log("match " + token + " " + judger);
         match(token, judger, client);
     });
     client.on("confirmParticipation", (token, gameId, response) => {
+        console.log("confirmPartcipation " + token + " " + gameId + " " + response);
         confirmParticipation(token, gameId, response);
     });
     client.on("updateBiography", (token, bio) => {
+        console.log("updateBiography " + token + " " + bio);
         updateBiography(token, bio, client);
     });
     client.on("updateProfilePicture", (token, pic) => {
+        console.log("updateProfilePicture " + token + " " + pic);
         updateProfilePicture(token, pic, client);
     });
     client.on("vote", (token, gameId, timeStamp) => {
+        console.log("vote " + token + " " + gameId + " " + timeStamp);
         vote(token, gameId, timeStamp, client);
     });
     client.on("comment", (token, gameId, comment) => {
+        console.log("comment " + token + " " + gameId + " " + comment);
         comments(token, gameId, comment, client);
     });
     client.on("videoOver", (token, gameId) => {
+        console.log("videoOver " + token + " " + gameId);
         videoOver(token, gameId, client);
     });
     client.on("getMessages", (token) => {
+        console.log("getMessage " + token);
         getMessages(token, client);
     });
     client.on("sendMessage", (token, receiver, message, timestamp) => {
+        console.log("sendMessage " + token + " " + receiver + " " + message + " " + timestamp);
         sendMessage(token, receiver, message, timestamp, client);
+    });
+    client.on('error', err => {
+        console.log("error " + err);
+    });
+    client.on('connecting', conn => {
+        console.log("connecting " + conn);
+    });
+    client.on('connect_failed', err => {
+        console.log("connect failed " +err);
+    });
+    client.on('message', message => {
+        console.log("message " + messsage);
+    });
+    client.on('reconnect', recon => {
+        console.log("reconnect " + recon);
+    });
+    client.on('reconnecting', recon => {
+        console.log("reconnecting " + recon);
+    });
+    client.on('reconnect_failed', err => {
+        console.log("reconnect failed " + err);
     });
 });
 server.listen(port);
 
 mongoClient.connect(url, (err, db) => {
-    if (err) return;
+    if (err) {
+        console.log(err);
+        return;
+    }
     var dbo = db.db(dbName);
     dbo.createCollection("videos", function (err, res) {
-        if (err) return;
+        if (err) {
+            console.log(err);
+            return;
+        }
     });
 });
 
 
 function match(token, judger, client) {
     if (!checkToken(token, client)) return;
-    player = {client: client, username: tokenMap.get(token), confirmed: false, hasWatched: false};
-    //TODO: DET BURDE VIRKE SÅDAN HER, MEN MAN KAN IKKE TESTE MED KUN EN KLIENT SÅ
-    /* if (judger) {
-      if (!judgerQueue.includes(client)) judgerQueue.push(player);
-      client.emit("inQueue", "success");
-    } else {
-      if (!nonJudgerQueue.includes(client)) nonJudgerQueue.push(player);
-      client.emit("inQueue", "success");
-    } */
+    var player = { client: client, username: tokenMap.get(token), confirmed: false, hasWatched: false };
+    judgerQueue = judgerQueue.filter(queuedPlayer => {
+        queuedPlayer.username != player.username
+    });
+    nonJudgerQueue = nonJudgerQueue.filter(queuedPlayer => {
+        queuedPlayer.username != player.username
+    });
     if (judger) {
         judgerQueue.push(player);
         client.emit("inQueue", "success");
@@ -94,6 +137,8 @@ function match(token, judger, client) {
     if (canPlay()) {
         requestGame();
     }
+    judgerQueue.forEach(dude => { console.log("judger => " + dude.username)});
+    nonJudgerQueue.forEach(dude => { console.log("nonJudger => " + dude.username)});
 }
 
 function canPlay() {
@@ -112,7 +157,7 @@ function requestGame() {
         nonJudger.client.emit("match", gameId);
     });
 
-    let game = {judgers: judgers, nonJudgers: nonJudgers, round: 1};
+    let game = { judgers: judgers, nonJudgers: nonJudgers, round: 1 };
     unconfirmedGames.set(gameId, game);
 }
 
@@ -198,6 +243,7 @@ function comments(token, gameId, comment, client) { //TODO: gem de her comments
     console.log("comment " + comment);
     mongoClient.connect(url, (err, db) => {
         if (err) {
+            console.log(err);
             db.close();
             client.emit("comment", "failure");
             return;
@@ -206,8 +252,9 @@ function comments(token, gameId, comment, client) { //TODO: gem de her comments
         const dbo = db.db(dbName);
 
         game.nonJudgers.forEach(nonJudger => {
-            dbo.collection("comments").insertOne({_id: nonJudger.username, comment: comment}, (err, result) => {
+            dbo.collection("comments").insertOne({ _id: nonJudger.username, comment: comment }, (err, result) => {
                 if (err) {
+                    console.log(err);
                     db.close();
                     client.emit("comment", "failure");
                     return;
@@ -276,19 +323,30 @@ function login(username, password, client) {
     console.log(username + " logged in");
     mongoClient.connect(url, (err, db) => {
         if (err) {
+            console.log(err);
             client.emit("login", "failure");
             db.close();
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("users").findOne({_id: username, password: password}, (err, result) => {
+        dbo.collection("users").findOne({ _id: username, password: password }, (err, result) => {
             if (err) {
+                console.log(err);
                 client.emit("login", "failure");
                 db.close();
                 return;
             }
             else if (result != null) {
+                tokenMap.forEach((value, key, a)=> {
+                    if(value == username) {
+                        tokenMap.delete(key);
+                    }
+                });
                 let token = generateUUID();
+                var client2 = clientMap.get(username);
+                if(client2 != null) {
+                    client2.disconnect();
+                }
                 clientMap.set(username, client);
                 tokenMap.set(token, username);
                 client.emit("login", token);
@@ -301,6 +359,7 @@ function login(username, password, client) {
 }
 
 function checkToken(token, client) {
+    console.log("checkToken " + token);
     if (!tokenMap.has(token)) {
         console.log("token fail");
         client.emit("invalid token");
@@ -315,15 +374,14 @@ function handleVideoUpload(token, roundNumber, data, client) {
     mongoClient.connect(url, (err, db) => {
         let username = tokenMap.get(token);
         if (err) {
+            console.log(err);
             db.close();
             client.emit("uploadFile", "failure");
             return;
         }
         const dbo = db.db(dbName);
         let round = "round" + roundNumber;
-        console.log("data");
-        console.log(data);
-        dbo.collection("videos").updateOne({_id: username}, {$set: {[round]: data}}, {upsert: true});
+        dbo.collection("videos").updateOne({ _id: username }, { $set: { [round]: data } }, { upsert: true });
         db.close();
         client.emit("uploadFile", "success");
     });
@@ -333,17 +391,18 @@ function getVideo(token, username, roundNumber, client) {
     if (!checkToken(token, client)) return;
     mongoClient.connect(url, (err, db) => {
         if (err) {
+            console.log(err);
             db.close();
             client.emit("getVideo", "failure");
             return;
         }
         const dbo = db.db(dbName);
         let round = "round" + roundNumber;
-        dbo.collection("videos").findOne({_id: username}, (err, result) => {
+        dbo.collection("videos").findOne({ _id: username }, (err, result) => {
             if (err || result == null) {
+                if (err) console.log(err);
                 db.close();
                 client.emit("getVideo", "failure");
-                console.log("video failure");
                 return;
             }
             if (result[round] != null) {
@@ -359,21 +418,23 @@ function getVideo(token, username, roundNumber, client) {
 function createUser(username, password, sex, age, client) {
     mongoClient.connect(url, (err, db) => {
         if (err) {
+            console.log(err);
             client.emit("createUser", "failure");
             db.close();
             return;
         }
         const dbo = db.db(dbName);
         dbo.collection("users").insertOne({
-                _id: username,
-                password: password,
-                sex: sex,
-                age: age,
-                biography: null,
-                profilePicture: null
-            },
+            _id: username,
+            password: password,
+            sex: sex,
+            age: age,
+            biography: null,
+            profilePicture: null
+        },
             (err, result) => {
                 if (err) {
+                    console.log(err);
                     client.emit("createUser", "failure");
                     db.close();
                     return;
@@ -389,12 +450,13 @@ function updateBiography(token, bio, client) {
     let username = tokenMap.get(token);
     mongoClient.connect(url, (err, db) => {
         if (err) {
+            console.log(err);
             client.emit("updateBiography", "failure");
             db.close();
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("users").updateOne({_id: username}, {$set: {biography: bio}},
+        dbo.collection("users").updateOne({ _id: username }, { $set: { biography: bio } },
             (err, result) => {
                 if (err) {
                     console.log(err);
@@ -413,14 +475,16 @@ function updateProfilePicture(token, pic, client) {
     let username = tokenMap.get(token);
     mongoClient.connect(url, (err, db) => {
         if (err) {
+            console.log(err);
             db.close();
             client.emit("updateProfilePicture", "failure");
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("users").updateOne({_id: username}, {$set: {profilePicture: pic}},
+        dbo.collection("users").updateOne({ _id: username }, { $set: { profilePicture: pic } },
             (err, result) => {
                 if (err) {
+                    console.log(err);
                     db.close();
                     client.emit("updateProfilePicture", "failure");
                     return;
@@ -435,23 +499,23 @@ function getUser(token, user, client) {
     if (!checkToken(token, client)) return;
     mongoClient.connect(url, (err, db) => {
         if (err) {
+            console.log(err);
             db.close();
             client.emit("getUser", "failure");
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("users").findOne({_id: user}, (err, result) => {
+        dbo.collection("users").findOne({ _id: user }, (err, result) => {
             if (err || result == null) {
+                console.log(err);
                 db.close();
                 client.emit("getUser", "failure");
                 return;
             }
             db.close();
-            console.log(result);
 
             if (result.profilePicture != null && result.profilePicture.buffer != null) result.profilePicture = result.profilePicture.buffer;
 
-            console.log(result);
             client.emit("getUser", result);
         });
     });
@@ -459,16 +523,18 @@ function getUser(token, user, client) {
 
 function getMessages(token, client) {
     if (!checkToken(token, client)) return;
-    username = tokenMap.get(token);
+    var username = tokenMap.get(token);
     mongoClient.connect(url, (err, db) => {
         if (err) {
+            console.log(err);
             db.close();
             client.emit("getMessages", "failure");
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("messages").find({$or: [{sender: username}, {reciever: username}]}, (err, result) => {
+        dbo.collection("messages").find({ $or: [{ sender: username }, { reciever: username }] }, (err, result) => {
             if (err) {
+                console.log(err);
                 db.close();
                 client.emit("getMessages", "failure");
                 return;
@@ -481,9 +547,10 @@ function getMessages(token, client) {
 function sendMessage(token, reciever, message, timestamp, client) {
     if (!checkToken(token, client)) return;
     var sender = tokenMap.get(token);
-    var messageToSend = {sender: sender, reciever: reciever, message: message, timestamp: timestamp};
+    var messageToSend = { sender: sender, reciever: reciever, message: message, timestamp: timestamp };
     mongoClient.connect(url, (err, db) => {
         if (err) {
+            console.log(err);
             db.close();
             client.emit("sendMessage", "failure");
             return;
@@ -491,6 +558,7 @@ function sendMessage(token, reciever, message, timestamp, client) {
         const dbo = db.db(dbName);
         dbo.collection("messages").insertOne(messageToSend, (err, result) => {
             if (err) {
+                console.log(err);
                 db.close();
                 client.emit("sendMessage", "failure");
                 return;
