@@ -77,9 +77,9 @@ io.on('connection', client => {
         console.log("comment " + token + " " + gameId + " " + comment);
             comments(token, gameId, comment, timeStamp, client);
     });
-    client.on("getComment", (token, username) => {
+    client.on("getComments", (token, username) => {
         console.log("getComment " + token + " " + username);
-        getComments(token, gameId, comment, timeStamp, client);
+        getComments(token, username, client);
     });
 
     client.on("videoOver", (token, gameId) => {
@@ -262,15 +262,18 @@ function getComments(token, user, client) {
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("comments").find({ to: user } , (err, result) => {
+        dbo.collection("comments").find({ username: user } ,{_id:0, username:0} , (err, result) => {
             if (err || result == null) {
                 console.log(err);
                 db.close();
                 client.emit("getComments", "failure");
                 return;
             }
-            db.close();
-            result.toArray().then(messages => client.emit("getComments", messages));
+            result.toArray().then(messages => {
+                console.log(messages);
+                client.emit("getComments", messages)
+                db.close();
+            });
         });
     });
 }
