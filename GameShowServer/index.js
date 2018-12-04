@@ -263,7 +263,7 @@ function getComments(token, client) {
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("comments").find({}, {fields:{ _id: 0 }}, (err, result) => {
+        dbo.collection("comments").find({}, { fields: { _id: 0 } }, (err, result) => {
             if (err || result == null) {
                 console.log(err);
                 db.close();
@@ -280,7 +280,7 @@ function getComments(token, client) {
 }
 
 function comments(token, toUser, comment, timeStamp, roundNumber, client) {
-    if(!checkToken(token, client)) return;
+    if (!checkToken(token, client)) return;
     mongoClient.connect(url, (err, db) => {
         if (err) {
             console.log(err);
@@ -288,26 +288,24 @@ function comments(token, toUser, comment, timeStamp, roundNumber, client) {
             client.emit("comment", "failure");
             return;
         }
-
         const dbo = db.db(dbName);
-        
-            dbo.collection("comments").insertOne({
-                text: comment,
-                timestamp: timeStamp,
-                from: tokenMap.get(token),
-                to: toUser,
-                video: roundNumber
-            }, (err, result) => {
-                if (err) {
-                    console.log(err);
-                    db.close();
-                    client.emit("comment", "failure");
-                    return;
-                } else {
-                    client.emit("comment", "success");
-                    db.close();
-                }
-            });
+        dbo.collection("comments").insertOne({
+            text: comment,
+            timestamp: timeStamp,
+            from: tokenMap.get(token),
+            to: toUser,
+            video: roundNumber
+        }, (err, result) => {
+            if (err) {
+                console.log(err);
+                db.close();
+                client.emit("comment", "failure");
+                return;
+            } else {
+                client.emit("comment", "success");
+                db.close();
+            }
+        });
     });
 
 
