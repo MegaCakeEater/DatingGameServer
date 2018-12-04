@@ -3,12 +3,12 @@ const server = require('http').createServer();
 const io = require('socket.io')({
     path: '',
     serveClient: false,
-  });
+});
 io.attach(server, {
-    pingInterval: 10000,
-    pingTimeout: 5000,
+    pingInterval: 1000000,
+    pingTimeout: 500000,
     cookie: false
-  });
+});
 const port = 3001;
 const dbName = "GameShowDatingAppDB";
 const mongoClient = require('mongodb').MongoClient;
@@ -17,7 +17,7 @@ const tokenMap = new Map();
 const clientMap = new Map();
 var judgerQueue = [];
 var nonJudgerQueue = [];
-const judgersNeededToPlay = 2;
+const judgersNeededToPlay = 1;
 const nonJudgersNeededToPlay = 1;
 const activeGames = new Map();
 const unconfirmedGames = new Map();
@@ -73,13 +73,13 @@ io.on('connection', client => {
         console.log("vote " + token + " " + gameId + " " + timeStamp);
         vote(token, gameId, timeStamp, client);
     });
-    client.on("comment", (token, gameId, comment,timeStamp) => {
-        console.log("comment " + token + " " + gameId + " " + comment);
-            comments(token, gameId, comment, timeStamp, client);
+    client.on("comment", (token, toUser, comment, timeStamp, roundNumber) => {
+        console.log("comment " + token + " " + " " + comment);
+        comments(token, toUser, comment, timeStamp, roundNumber, client);
     });
-    client.on("getComments", (token, username) => {
-        console.log("getComment " + token + " " + username);
-        getComments(token, username, client);
+    client.on("getComments", (token) => {
+        console.log("getComment " + token);
+        getComments(token, client);
     });
 
     client.on("videoOver", (token, gameId) => {
@@ -101,7 +101,7 @@ io.on('connection', client => {
         console.log("connecting " + conn);
     });
     client.on('connect_failed', err => {
-        console.log("connect failed " +err);
+        console.log("connect failed " + err);
     });
     client.on('message', message => {
         console.log("message " + message);
@@ -252,8 +252,9 @@ function vote(token, gameId, timeStamp, client) { //TODO: database til timestamp
     }
 }
 
-function getComments(token, user, client) {
+function getComments(token, client) {
     if (!checkToken(token, client)) return;
+    const username = tokenMap.get(token);
     mongoClient.connect(url, (err, db) => {
         if (err) {
             console.log(err);
@@ -262,7 +263,7 @@ function getComments(token, user, client) {
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("comments").find({ username: user } ,{_id:0, username:0} , (err, result) => {
+        dbo.collection("comments").find({}, {fields:{ _id: 0 }}, (err, result) => {
             if (err || result == null) {
                 console.log(err);
                 db.close();
@@ -271,15 +272,15 @@ function getComments(token, user, client) {
             }
             result.toArray().then(messages => {
                 console.log(messages);
-                client.emit("getComments", messages)
+                client.emit("getComments", messages);
                 db.close();
             });
         });
     });
 }
 
-function comments(token, gameId, comment, timeStamp, client) { //TODO: gem de her comments
-    console.log("comment " + comment);
+function comments(token, toUser, comment, timeStamp, roundNumber, client) {
+    if(!checkToken(token, client)) return;
     mongoClient.connect(url, (err, db) => {
         if (err) {
             console.log(err);
@@ -289,28 +290,24 @@ function comments(token, gameId, comment, timeStamp, client) { //TODO: gem de he
         }
 
         const dbo = db.db(dbName);
-
-        const game = activeGames.get(gameId);
-        const commentObj = {
-            text: comment,
-            timestamp: timeStamp,
-            from: clientMap.get(client),
-            to: game.username,
-            video: game.round
-        };
-
-        game.nonJudgers.forEach(nonJudger => {
-            dbo.collection("comments").insertOne({username: nonJudger.username, comment: commentObj}, (err, result) => {
+        
+            dbo.collection("comments").insertOne({
+                text: comment,
+                timestamp: timeStamp,
+                from: tokenMap.get(token),
+                to: toUser,
+                video: roundNumber
+            }, (err, result) => {
                 if (err) {
                     console.log(err);
                     db.close();
                     client.emit("comment", "failure");
                     return;
+                } else {
+                    client.emit("comment", "success");
+                    db.close();
                 }
             });
-        });
-        db.close();
-        client.emit("comment", "success");
     });
 
 
@@ -321,7 +318,7 @@ function videoOver(token, gameId, client) {
     var username = tokenMap.get(token);
     var game = activeGames.get(gameId);
     game.judgers.forEach((judger) => {
-        if (judger.username = username) judger.hasWatched = true;
+        if (judger.username == username) judger.hasWatched = true;
     });
 
     if (canGoToNextRound(game)) {
@@ -330,7 +327,12 @@ function videoOver(token, gameId, client) {
 }
 
 function canGoToNextRound(game) {
-    return game.judgers.every(judge => judge.hasWatched);
+    var canGoToNext = true;
+    game.judgers.forEach(judge => {
+        canGoToNext = canGoToNext && judge.hasWatched
+    });
+    console.log(canGoToNext);
+    return canGoToNext;
 }
 
 function startNextRound(game) {
@@ -340,19 +342,19 @@ function startNextRound(game) {
     }
     game.judgers.forEach(judger => {
         judger.hasWatched = false;
-        judger.client.emit("gameUpdate", game.judgers, judgersNeededToPlay, game.round);
+        judger.client.emit("gameUpdate", game.judgers.length, judgersNeededToPlay, game.round);
     });
     game.nonJudgers.forEach(nonJudger => {
-        nonJudger.client.emit("gameUpdate", game.judgers, judgersNeededToPlay, game.round);
+        nonJudger.client.emit("gameUpdate", game.judgers.length, judgersNeededToPlay, game.round);
     });
 }
 
 function handleGameOver(game) {
     game.judgers.forEach(judger => {
-        judger.client.emit("gameOver");
+        judger.client.emit("gameOver", game.nonJudgers.map(nonJudger => nonJudger.username));
     });
     game.nonJudgers.forEach(nonJudger => {
-        nonJudger.emit("gameOver", game.judgers.map(judger => judger.username));
+        nonJudger.client.emit("gameOver", game.judgers.map(judger => judger.username));
         /*    game.judgers.forEach(judger => {
                 nonJudger.client.emit("gameOver", judger.username);
             });*/
@@ -384,14 +386,14 @@ function login(username, password, client) {
                 return;
             }
             else if (result != null) {
-                tokenMap.forEach((value, key, a)=> {
-                    if(value == username) {
+                tokenMap.forEach((value, key, a) => {
+                    if (value == username) {
                         tokenMap.delete(key);
                     }
                 });
                 let token = generateUUID();
                 var client2 = clientMap.get(username);
-                if(client2 != null) {
+                if (client2 != null) {
                     client2.disconnect();
                 }
                 clientMap.set(username, client);
@@ -428,7 +430,7 @@ function handleVideoUpload(token, roundNumber, data, client) {
         }
         const dbo = db.db(dbName);
         writeFile(videoDir, username + roundNumber, data);
-        dbo.collection("videos").updateOne({ username: username, roundNumber: roundNumber }, { $set: { video : username + roundNumber } }, { upsert: true });
+        dbo.collection("videos").updateOne({ username: username, roundNumber: roundNumber }, { $set: { video: username + roundNumber } }, { upsert: true });
         db.close();
         client.emit("uploadFile", "success");
     });
@@ -444,7 +446,7 @@ function getVideo(token, username, roundNumber, client) {
             return;
         }
         const dbo = db.db(dbName);
-        dbo.collection("videos").findOne({ username: username, roundNumber: roundNumber}, (err, result) => {
+        dbo.collection("videos").findOne({ username: username, roundNumber: roundNumber }, (err, result) => {
             if (err || result == null) {
                 if (err) console.log(err);
                 db.close();
@@ -453,7 +455,7 @@ function getVideo(token, username, roundNumber, client) {
             }
             if (result.video != null) {
                 getFile(videoDir, result.video, (data => {
-                    client.emit("getVideo", {video:data.buffer});
+                    client.emit("getVideo", { video: data.buffer });
                 }));
             } else {
                 client.emit("getVideo", "failure");
@@ -464,15 +466,15 @@ function getVideo(token, username, roundNumber, client) {
 }
 
 function getFile(dir, filename, callback) {
-    console.log(dir +'/' +filename);
-    fs.readFile(dir +'/' +filename,(err, data) => {
+    console.log(dir + '/' + filename);
+    fs.readFile(dir + '/' + filename, (err, data) => {
         callback(data);
     });
 }
 
 function writeFile(dir, filename, content) {
-    
-    fs.writeFileSync(require('path').resolve(dir +'/',filename), new Buffer(content, 'base64'), null, (err) => {
+
+    fs.writeFileSync(require('path').resolve(dir + '/', filename), new Buffer(content, 'base64'), null, (err) => {
         console.log(err);
     });
 }

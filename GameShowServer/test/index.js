@@ -77,7 +77,7 @@ socket.on("getUser", response => {
 socket.on("login", (token) => {
     myToken = token;
     tokens.push(token);
-        socket.emit("getVideo", token, "a", 1);
+        socket.emit("comment", token, "b", "asdasdasdas", 1000, 1);
     /* socket.emit("updateBiography",token,"hest23");
     socket.emit("getUser",token, "hest23");
     socket.emit("match", myToken); */
