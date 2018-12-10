@@ -1,3 +1,7 @@
+/*  Andreas Jeppesen - ajepp09@student.sdu.dk
+    Emil Jensen - emije14@student.sdu.dk
+    Nicolai Jensen - nije214@student.sdu.dk */
+
 'use strict';
 const server = require('http').createServer();
 const io = require('socket.io')({
@@ -17,7 +21,7 @@ const tokenMap = new Map();
 const clientMap = new Map();
 var judgerQueue = [];
 var nonJudgerQueue = [];
-const judgersNeededToPlay = 1;
+const judgersNeededToPlay = 2;
 const nonJudgersNeededToPlay = 1;
 const activeGames = new Map();
 const unconfirmedGames = new Map();
